@@ -1,0 +1,29 @@
+# ROS 2 build folders (if built in-place)
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.byte
+*.egg-info/
+.eggs/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store

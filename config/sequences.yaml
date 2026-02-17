@@ -1,0 +1,51 @@
+sequences:
+  - name: "Speaking"
+    start: 1695
+    end: 1820
+    rate: 30
+    type: 1
+  - name: "Calm"
+    start: 550
+    end: 1100
+    rate: 30
+    type: 1
+  - name: "Smile"
+    start: 1050
+    end: 1250
+    rate: 30
+    type: 1
+  - name: "Thinking"
+    start: 1250
+    end: 1500
+    rate: 30
+    type: 1
+  - name: "Agree Laugh"
+    start: 1500
+    end: 1800
+    rate: 30
+    type: 1
+  - name: "Agree"
+    start: 1780
+    end: 2069
+    rate: 30
+    type: 1
+  - name: "Busy"
+    start: 410
+    end: 510
+    rate: 30
+    type: 1
+  - name: "Eratic"
+    start: 300
+    end: 550
+    rate: 30
+    type: 1
+  - name: "Stuck"
+    start: 410
+    end: 450
+    rate: 30
+    type: 1
+  - name: "Idle"
+    start: 300
+    end: 1695
+    rate: 30
+    type: 1
