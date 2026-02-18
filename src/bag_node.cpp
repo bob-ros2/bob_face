@@ -400,6 +400,13 @@ private:
     return; \
   }
 
+#define RETURN_WARN_IF(condition, msg) \
+  if (condition) { \
+    response->error = msg; \
+    RCLCPP_WARN(this->get_logger(), msg); \
+    return; \
+  }
+
 #define DUMP_PARAMS_STREAM(stream) \
   RCLCPP_DEBUG_STREAM(this->get_logger(), "" << stream)
 
@@ -413,7 +420,7 @@ private:
       request->start > request->end,
       "set_sequence: Sequence start is greater than sequence end");
     RETURN_ERROR_IF(request->type > 1, "set_sequence: Unkown type parameter");
-    RETURN_ERROR_IF(
+    RETURN_WARN_IF(
       !frame_buffer_loaded_,
       "set_sequence: Framebuffer is not fully loaded yet");
 
