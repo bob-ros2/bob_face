@@ -1,5 +1,7 @@
 # ROS Package [bob_face](https://github.com/bob-ros2/bob_face)
-[![CI](https://github.com/bob-ros2/bob_face/actions/workflows/ros2_ci.yaml/badge.svg)](https://github.com/bob-ros2/bob_face/actions/workflows/ros2_ci.yaml)
+[![ROS2 CI](https://github.com/bob-ros2/bob_face/actions/workflows/ros2_ci.yaml/badge.svg)](https://github.com/bob-ros2/bob_face/actions/workflows/ros2_ci.yaml)
+[![amd64](https://img.shields.io/github/actions/workflow/status/bob-ros2/bob_face/docker.yml?label=amd64&logo=docker)](https://github.com/bob-ros2/bob_face/actions/workflows/docker.yml)
+[![arm64](https://img.shields.io/github/actions/workflow/status/bob-ros2/bob_face/docker.yml?label=arm64&logo=docker)](https://github.com/bob-ros2/bob_face/actions/workflows/docker.yml)
 
 ROS 2 package for facial animation playback and sentiment-driven color orchestration.
 
