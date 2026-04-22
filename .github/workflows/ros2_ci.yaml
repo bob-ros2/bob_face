@@ -14,6 +14,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          path: bob_face
+
+      - name: Checkout bob_msgs
+        uses: actions/checkout@v3
+        with:
+          repository: bob-ros2/bob_msgs
+          path: bob_msgs
 
       - name: Install dependencies
         run: |
