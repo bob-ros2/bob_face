@@ -43,9 +43,10 @@ class SentimentNode(Node):
         super().__init__('sentiment')
 
         # Declare Parameters
+        default_repo = 'Xenova/distilbert-base-multilingual-cased-sentiments-student'
         self.declare_parameter(
             'model_repo',
-            os.environ.get('SENTIMENT_MODEL_REPO', 'Xenova/distilbert-base-multilingual-cased-sentiments-student'),
+            os.environ.get('SENTIMENT_MODEL_REPO', default_repo),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='HuggingFace repo for multilingual ONNX model.'
