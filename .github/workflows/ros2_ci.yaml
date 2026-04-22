@@ -33,14 +33,14 @@ jobs:
       - name: Build
         run: |
           . /opt/ros/humble/setup.sh
-          colcon build --packages-select bob_face \
+          colcon build --packages-up-to bob_face \
             --build-base ../build \
             --install-base ../install
 
       - name: Test
         run: |
           . /opt/ros/humble/setup.sh
-          colcon test --packages-select bob_face \
+          colcon test --packages-up-to bob_face \
             --build-base ../build \
             --install-base ../install
           colcon test-result --test-result-base ../build --all --verbose
