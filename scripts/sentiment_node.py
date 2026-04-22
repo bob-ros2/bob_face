@@ -26,10 +26,10 @@ import time
 
 import huggingface_hub
 import numpy as np
-import onnxruntime as ort
 from matplotlib import colormaps
-import rclpy
+import onnxruntime as ort
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
+import rclpy
 from rclpy.node import Node
 from std_msgs.msg import ColorRGBA, Float32, String
 from tokenizers import Tokenizer
@@ -72,24 +72,6 @@ class SentimentNode(Node):
         )
 
         self.declare_parameter(
-            'analize_topic',
-            os.environ.get('SENTIMENT_ANALIZE_TOPIC', 'analize'),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_STRING,
-                description='Topic for input text. (Env: SENTIMENT_ANALIZE_TOPIC)'
-            )
-        )
-
-        self.declare_parameter(
-            'color_topic',
-            os.environ.get('SENTIMENT_COLOR_TOPIC', 'face_color_override'),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_STRING,
-                description='Topic for color output. (Env: SENTIMENT_COLOR_TOPIC)'
-            )
-        )
-
-        self.declare_parameter(
             'smooth_alpha',
             float(os.environ.get('SENTIMENT_SMOOTH_ALPHA', '0.3')),
             ParameterDescriptor(
@@ -116,6 +98,15 @@ class SentimentNode(Node):
             )
         )
 
+        self.declare_parameter(
+            'temperature',
+            float(os.environ.get('SENTIMENT_TEMPERATURE', '1.0')),
+            ParameterDescriptor(
+                type=ParameterType.PARAMETER_DOUBLE,
+                description='Logit temperature. Lower = more extreme. (Env: SENTIMENT_TEMPERATURE)'
+            )
+        )
+
         # Internal state
         self.context_buffer = ''
         self.last_score = 0.5  # Neutral start
@@ -135,20 +126,16 @@ class SentimentNode(Node):
 
         # Setup Pub/Sub
         self.pub_score = self.create_publisher(Float32, 'sentiment_score', 10)
-        self.pub_color = self.create_publisher(
-            ColorRGBA,
-            self.get_parameter('color_topic').value,
-            10
-        )
+        self.pub_color = self.create_publisher(ColorRGBA, 'face_color_override', 10)
 
         self.sub_text = self.create_subscription(
             String,
-            self.get_parameter('analize_topic').value,
+            'analize',
             self.text_callback,
             10
         )
 
-        self.get_logger().info('Sentiment Node initialized with DistilBERT ONNX.')
+        self.get_logger().info('Sentiment Node initialized (DistilBERT ONNX).')
 
     def load_transformer_model(self):
         """Download and load the ONNX model and tokenizer."""
@@ -251,17 +238,20 @@ class SentimentNode(Node):
             'attention_mask': attention_mask
         })
 
-        # Process Logits (Usually [Batch, 2] for SST-2: Negative, Positive)
+        # Process Logits
         logits = outputs[0][0]
+        temp = self.get_parameter('temperature').value
+        if temp <= 0:
+            temp = 1.0
+        logits = logits / temp
+
         exp_logits = np.exp(logits - np.max(logits))
         probs = exp_logits / exp_logits.sum()
 
         # Calculate raw sentiment score: 0 (Negative) to 1 (Positive)
-        # For SST-2: Probs[0] is negative, Probs[1] is positive
         new_score = probs[1]
 
         # Apply Sensitivity and Clipping
-        # Shift to -1..1 first
         compound = (new_score * 2.0) - 1.0
         compound *= self.get_parameter('sensitivity').value
         compound = max(-1.0, min(1.0, compound))
@@ -270,8 +260,11 @@ class SentimentNode(Node):
         new_score = (compound + 1.0) / 2.0
 
         # Exponential smoothing (Leaky Integrator)
-        alpha = self.get_parameter('smooth_alpha').value
-        self.last_score = (alpha * new_score) + ((1.0 - alpha) * self.last_score)
+        if max_buf > 0:
+            alpha = self.get_parameter('smooth_alpha').value
+            self.last_score = (alpha * new_score) + ((1.0 - alpha) * self.last_score)
+        else:
+            self.last_score = new_score
 
         # Publish Score
         score_msg = Float32()

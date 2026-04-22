@@ -49,14 +49,31 @@ Standard integration flow:
 
 | Node | Parameter | Default | Description |
 |------|-----------|---------|-------------|
-| `sentiment` | `model_repo` | `Xenova/distilbert-base-uncased-finetuned-sst-2-english` | HuggingFace repository for the ONNX model. (Env: SENTIMENT_MODEL_REPO) |
-| `sentiment` | `model_dir` | `""` | Local directory to store/load the model. (Env: SENTIMENT_MODEL_DIR) |
-| `sentiment` | `sensitivity` | `1.5` | Sensitivity multiplier for sentiment score. (Env: SENTIMENT_SENSITIVITY) |
-| `sentiment` | `smooth_alpha` | `0.3` | Smoothing factor (0..1). Lower is smoother. (Env: SENTIMENT_SMOOTH_ALPHA) |
-| `sentiment` | `buffer_size` | `0` | Window for text accumulation. Set to 0 for per-message analysis. (Env: SENTIMENT_BUFFER_SIZE) |
+| `sentiment` | `model_repo` | `Xenova/distilbert-base-uncased-finetuned-sst-2-english` | HF-Repository für das ONNX-Modell. |
+| `sentiment` | `model_dir` | `""` | Lokales Verzeichnis zum Speichern/Laden des Modells. |
+| `sentiment` | `sensitivity` | `1.5` | Multiplikator für den Sentiment-Score. |
+| `sentiment` | `smooth_alpha` | `0.3` | Glättungsfaktor (0..1). Niedriger = träger. |
+| `sentiment` | `temperature` | `1.0` | Skalierung der Modell-Ausgabe. < 1.0 = extremer. |
+| `sentiment` | `buffer_size` | `0` | Fenstergröße für Kontext. 0 = deaktiviert Smoothing. |
 | `motion_manager`| `seconds_per_char` | `0.07` | Heuristic for speaking duration. (Env: MOTION_SECONDS_PER_CHAR) |
 | `motion_manager`| `idle_sequences`| `""` | Comma-separated idle sequence names. |
 | `motion_manager`| `speaking_sequences`| `""` | Comma-separated speaking sequence names. |
+
+## Sentiment Tuning
+
+Um das Verhalten von Bob's Stimmung optimal anzupassen, stehen folgende Parameter zur Verfügung:
+
+### `temperature` (Logit Scaling)
+Das Modell gibt Wahrscheinlichkeiten aus. Mit der `temperature` kannst du steuern, wie "sicher" sich das Modell sein soll:
+*   **< 1.0 (z.B. 0.5):** Macht die Ergebnisse **extremer**. Bob wechselt schneller zwischen sehr glücklich und sehr traurig. Kleiner Nuancen führen bereits zu starken Farbausschlägen.
+*   **> 1.0 (z.B. 2.0):** Macht die Ergebnisse **neutraler**. Bob bleibt länger im mittleren Farbbereich (gelb/orange) und reagiert nur auf sehr eindeutige Aussagen extrem.
+
+### `sensitivity`
+Dies ist ein linearer Multiplikator, der nach der Berechnung des Scores angewendet wird. Er hilft dabei, den Wertebereich (0..1) voll auszunutzen, falls das Modell zu konservative Schätzungen abgibt.
+
+### `smooth_alpha` & `buffer_size`
+*   **`buffer_size := 0`**: Deaktiviert die Glättung komplett. Bob reagiert **sofort** auf den aktuellen Satz. Ideal für direkte Interaktion.
+*   **`buffer_size > 0`**: Aktiviert einen gleitenden Durchschnitt (Leaky Integrator). Bob "merkt" sich die Stimmung der letzten Sätze. `smooth_alpha` bestimmt dabei, wie schnell neue Sätze die aktuelle Stimmung beeinflussen.
 
 ## Requirements
 - Python: `onnxruntime`, `tokenizers`, `matplotlib`, `PyQt5`, `PyYAML`, `numpy<2`
