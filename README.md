@@ -49,7 +49,7 @@ Standard integration flow:
 
 | Node | Parameter | Default | Description |
 |------|-----------|---------|-------------|
-| `sentiment` | `model_repo` | `Xenova/...` | HuggingFace repository for the ONNX model. (Env: SENTIMENT_MODEL_REPO) |
+| `sentiment` | `model_repo` | `Xenova/distilbert-base-uncased-finetuned-sst-2-english` | HuggingFace repository for the ONNX model. (Env: SENTIMENT_MODEL_REPO) |
 | `sentiment` | `model_dir` | `""` | Local directory to store/load the model. (Env: SENTIMENT_MODEL_DIR) |
 | `sentiment` | `sensitivity` | `1.5` | Sensitivity multiplier for sentiment score. (Env: SENTIMENT_SENSITIVITY) |
 | `sentiment` | `smooth_alpha` | `0.3` | Smoothing factor (0..1). Lower is smoother. (Env: SENTIMENT_SMOOTH_ALPHA) |

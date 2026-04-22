@@ -27,8 +27,8 @@ import time
 import huggingface_hub
 import numpy as np
 import onnxruntime as ort
-import rclpy
 from matplotlib import colormaps
+import rclpy
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from rclpy.node import Node
 from std_msgs.msg import ColorRGBA, Float32, String
@@ -43,9 +43,10 @@ class SentimentNode(Node):
         super().__init__('sentiment')
 
         # Declare Parameters
+        default_repo = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english'
         self.declare_parameter(
             'model_repo',
-            os.environ.get('SENTIMENT_MODEL_REPO', 'Xenova/tiny-bert-sst2-distilled'),
+            os.environ.get('SENTIMENT_MODEL_REPO', default_repo),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='HF repo for ONNX model. (Env: SENTIMENT_MODEL_REPO)'
@@ -116,7 +117,7 @@ class SentimentNode(Node):
         )
 
         # Internal state
-        self.context_buffer = ""
+        self.context_buffer = ''
         self.last_score = 0.5  # Neutral start
         self.session = None
         self.tokenizer = None
@@ -129,7 +130,7 @@ class SentimentNode(Node):
             name = self.get_parameter('cmap_name').value
             self.cmap = colormaps[name]
         except KeyError:
-            self.get_logger().error(f"Colormap '{name}' not found. Using 'plasma'.")
+            self.get_logger().error(f'Colormap "{name}" not found. Using "plasma".')
             self.cmap = colormaps['plasma']
 
         # Setup Pub/Sub
@@ -147,52 +148,64 @@ class SentimentNode(Node):
             10
         )
 
-        self.get_logger().info("Sentiment Node initialized with TinyBERT ONNX.")
+        self.get_logger().info('Sentiment Node initialized with DistilBERT ONNX.')
 
     def load_transformer_model(self):
         """Download and load the ONNX model and tokenizer."""
         repo = self.get_parameter('model_repo').value
         local_dir = self.get_parameter('model_dir').value
 
+        # Filename candidates
+        onnx_files = [
+            'onnx/model_quantized.onnx', 'onnx/model.onnx',
+            'model_quantized.onnx', 'model.onnx'
+        ]
+        tokenizer_file = 'tokenizer.json'
+
+        model_path = None
+        tokenizer_path = None
+
         if local_dir:
-            self.get_logger().info(f"Loading model from local directory: {local_dir}")
+            self.get_logger().info(f'Loading model from local directory: {local_dir}')
             os.makedirs(local_dir, exist_ok=True)
 
-            # Use specific local paths
-            repo_filename = "onnx/model_quantized.onnx"
-            tokenizer_filename = "tokenizer.json"
+            # Try to download/check files
+            for f in onnx_files:
+                try:
+                    self.get_logger().info(f'Trying to find/download: {f}')
+                    model_path = huggingface_hub.hf_hub_download(
+                        repo_id=repo,
+                        filename=f,
+                        local_dir=local_dir,
+                        local_dir_use_symlinks=False
+                    )
+                    break
+                except Exception:
+                    continue
 
             try:
-                # Download into local_dir without symlinks
-                model_path = huggingface_hub.hf_hub_download(
-                    repo_id=repo,
-                    filename=repo_filename,
-                    local_dir=local_dir,
-                    local_dir_use_symlinks=False
-                )
                 tokenizer_path = huggingface_hub.hf_hub_download(
                     repo_id=repo,
-                    filename=tokenizer_filename,
+                    filename=tokenizer_file,
                     local_dir=local_dir,
                     local_dir_use_symlinks=False
                 )
             except Exception as e:
-                self.get_logger().error(f"Error downloading to local_dir: {e}")
-                # Fallback check: maybe it's already there?
-                model_path = os.path.join(local_dir, "onnx", "model_quantized.onnx")
-                if not os.path.exists(model_path):
-                    model_path = os.path.join(local_dir, "model_quantized.onnx")
-                tokenizer_path = os.path.join(local_dir, "tokenizer.json")
+                self.get_logger().error(f'Tokenizer download failed: {e}')
+
         else:
-            self.get_logger().info(f"Loading model from HF cache: {repo}")
-            model_path = huggingface_hub.hf_hub_download(
-                repo_id=repo,
-                filename="onnx/model_quantized.onnx"
-            )
-            tokenizer_path = huggingface_hub.hf_hub_download(
-                repo_id=repo,
-                filename="tokenizer.json"
-            )
+            self.get_logger().info(f'Loading model from HF cache: {repo}')
+            for f in onnx_files:
+                try:
+                    model_path = huggingface_hub.hf_hub_download(repo_id=repo, filename=f)
+                    break
+                except Exception:
+                    continue
+            tokenizer_path = huggingface_hub.hf_hub_download(repo_id=repo, filename=tokenizer_file)
+
+        if not model_path or not os.path.exists(model_path):
+            self.get_logger().fatal('Could not find suitable ONNX model file in the repository.')
+            raise FileNotFoundError('ONNX model file not found.')
 
         try:
             # Load ONNX Session
@@ -201,9 +214,9 @@ class SentimentNode(Node):
             # Load Tokenizer
             self.tokenizer = Tokenizer.from_file(tokenizer_path)
             model_base = os.path.basename(model_path)
-            self.get_logger().info(f"Model loaded: {model_base}")
+            self.get_logger().info(f'Model loaded successfully: {model_base}')
         except Exception as e:
-            self.get_logger().fatal(f"Failed to load transformer model: {e}")
+            self.get_logger().fatal(f'Failed to initialize ONNX session: {e}')
             raise e
 
     def text_callback(self, msg: String):
