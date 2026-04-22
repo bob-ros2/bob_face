@@ -43,13 +43,12 @@ class SentimentNode(Node):
         super().__init__('sentiment')
 
         # Declare Parameters
-        default_repo = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english'
         self.declare_parameter(
             'model_repo',
-            os.environ.get('SENTIMENT_MODEL_REPO', default_repo),
+            os.environ.get('SENTIMENT_MODEL_REPO', 'Xenova/distilbert-base-multilingual-cased-sentiments-student'),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
-                description='HF repo for ONNX model. (Env: SENTIMENT_MODEL_REPO)'
+                description='HuggingFace repo for multilingual ONNX model.'
             )
         )
 
@@ -58,7 +57,7 @@ class SentimentNode(Node):
             os.environ.get('SENTIMENT_MODEL_DIR', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
-                description='Local dir to store model. (Env: SENTIMENT_MODEL_DIR)'
+                description='Local dir for model storage. (Env: SENTIMENT_MODEL_DIR)'
             )
         )
 
@@ -135,7 +134,7 @@ class SentimentNode(Node):
             10
         )
 
-        self.get_logger().info('Sentiment Node initialized (DistilBERT ONNX).')
+        self.get_logger().info('Sentiment Node initialized (Multilingual ONNX).')
 
     def load_transformer_model(self):
         """Download and load the ONNX model and tokenizer."""
@@ -248,8 +247,10 @@ class SentimentNode(Node):
         exp_logits = np.exp(logits - np.max(logits))
         probs = exp_logits / exp_logits.sum()
 
-        # Calculate raw sentiment score: 0 (Negative) to 1 (Positive)
-        new_score = probs[1]
+        # Mapping for Xenova/distilbert-base-multilingual-cased-sentiments-student
+        # id2label: {0: "positive", 1: "neutral", 2: "negative"}
+        # Target score: positive=1.0, neutral=0.5, negative=0.0
+        new_score = (probs[0] * 1.0) + (probs[1] * 0.5) + (probs[2] * 0.0)
 
         # Apply Sensitivity and Clipping
         compound = (new_score * 2.0) - 1.0
