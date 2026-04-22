@@ -21,20 +21,20 @@ This module provides a PyQt5-based interface to trigger, add, edit, and delete
 facial animation sequences stored in a YAML configuration file.
 """
 
-import sys
 import os
-import yaml
 import signal
+import sys
+
 import rclpy
-from rclpy.node import Node
+import yaml
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
-from visualization_msgs.msg import MarkerArray
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QSlider, QLabel, QGridLayout,
-                             QLineEdit, QSpinBox, QGroupBox, QMessageBox,
-                             QScrollArea)
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import (QApplication, QGridLayout, QGroupBox, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QScrollArea, QSlider, QSpinBox, QVBoxLayout,
+                             QWidget)
+from visualization_msgs.msg import MarkerArray
 
 
 # Handle Ctrl+C properly
@@ -88,7 +88,7 @@ class FaceGui(QWidget):
                     data = yaml.safe_load(f)
                     self.sequences = data.get('sequences', [])
             except Exception as e:
-                print(f"Error loading config: {e}")
+                self.node.get_logger().error(f"Error loading config: {e}")
 
         self.init_ui()
 
@@ -132,7 +132,6 @@ class FaceGui(QWidget):
         self.presets_container = QWidget()
         self.presets_layout = QGridLayout(self.presets_container)
         self.presets_layout.setSpacing(10)
-        # Ensure rows are tight
         self.presets_layout.setAlignment(Qt.AlignTop)
 
         self.scroll_area.setWidget(self.presets_container)
@@ -204,8 +203,9 @@ class FaceGui(QWidget):
         main_layout.addLayout(actions_layout)
 
         # --- Status Line ---
+        status_font = "color: #00ff00; font-size: 18px; font-weight: bold;"
         self.status_label = QLabel("Status: Ready")
-        self.status_label.setStyleSheet("color: #00ff00; font-size: 18px; font-weight: bold;")
+        self.status_label.setStyleSheet(status_font)
         main_layout.addWidget(self.status_label)
 
         self.setLayout(main_layout)
@@ -213,13 +213,11 @@ class FaceGui(QWidget):
 
     def refresh_presets(self):
         """Clear and rebuild the animation presets grid based on current sequences."""
-        # Clear existing widgets from the layout
         while self.presets_layout.count():
             item = self.presets_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
             elif item.layout():
-                # Recursive cleanup for sub-layouts
                 self.clear_layout(item.layout())
 
         cols = 3  # Use 3 columns to fit more items
@@ -271,18 +269,20 @@ class FaceGui(QWidget):
     def call_service(self, seq_dict):
         """Send a SetSequence service request to the face node."""
         if not self.client.wait_for_service(timeout_sec=1.0):
+            style = "color: #ff4444; font-size: 18px; font-weight: bold;"
             self.status_label.setText("Status: Service /set_sequence not available!")
-            self.status_label.setStyleSheet("color: #ff4444; font-size: 18px; font-weight: bold;")
+            self.status_label.setStyleSheet(style)
             return
 
         req = SetSequence.Request()
         req.start = seq_dict['start']
         req.end = seq_dict['end']
         req.type = seq_dict['type']
-        req.rate = self.rate_slider.value()  # Use the slider override
+        req.rate = self.rate_slider.value()
 
+        style = "color: #007acc; font-size: 18px; font-weight: bold;"
         self.status_label.setText(f"Status: Sending {seq_dict['name']}...")
-        self.status_label.setStyleSheet("color: #007acc; font-size: 18px; font-weight: bold;")
+        self.status_label.setStyleSheet(style)
 
         future = self.client.call_async(req)
         future.add_done_callback(self.service_callback)
@@ -292,22 +292,21 @@ class FaceGui(QWidget):
         try:
             response = future.result()
             if not response.error:
+                style = "color: #00ff00; font-size: 18px; font-weight: bold;"
                 self.status_label.setText("Status: Sequence accepted")
-                self.status_label.setStyleSheet("color: #00ff00; font-size: 18px; "
-                                                "font-weight: bold;")
+                self.status_label.setStyleSheet(style)
             else:
+                style = "color: #ff4444; font-size: 18px; font-weight: bold;"
                 self.status_label.setText(f"Status Error: {response.error}")
-                self.status_label.setStyleSheet(
-                    "color: #ff4444; font-size: 18px; font-weight: bold;"
-                )
+                self.status_label.setStyleSheet(style)
         except Exception as e:
+            style = "color: #ff4444; font-size: 18px; font-weight: bold;"
             self.status_label.setText(f"Status Exception: {str(e)}")
-            self.status_label.setStyleSheet("color: #ff4444; font-size: 18px; font-weight: bold;")
+            self.status_label.setStyleSheet(style)
 
     def marker_callback(self, msg):
         """Handle incoming MarkerArray messages (status monitoring)."""
         self.marker_count += 1
-        # No heavy processing here, just heartbeat awareness
         if self.marker_count % 30 == 0:
             self.node.get_logger().debug(f"Received MarkerArray frame {self.marker_count}")
 
@@ -322,7 +321,7 @@ class FaceGui(QWidget):
         self.call_service(temp_seq)
 
     def add_sequence(self):
-        """Add the current editor configuration to the sequence list or update existing one."""
+        """Add the current editor configuration to the sequence list."""
         name = self.edit_name.text()
         new_seq = {
             'name': name,
@@ -361,12 +360,14 @@ class FaceGui(QWidget):
         try:
             with open(self.config_path, 'w') as f:
                 yaml.dump({'sequences': self.sequences}, f, default_flow_style=False)
+            style = "color: #00ff00; font-size: 18px; font-weight: bold;"
             self.status_label.setText("Status: Config SAVED to YAML!")
-            self.status_label.setStyleSheet("color: #00ff00; font-size: 18px; font-weight: bold;")
+            self.status_label.setStyleSheet(style)
             QMessageBox.information(self, "Success", f"Config saved to:\n{self.config_path}")
         except Exception as e:
+            style = "color: #ff4444; font-size: 18px; font-weight: bold;"
             self.status_label.setText(f"Save Error: {str(e)}")
-            self.status_label.setStyleSheet("color: #ff4444; font-size: 18px; font-weight: bold;")
+            self.status_label.setStyleSheet(style)
 
     def ros_spin(self):
         """Process ROS 2 callbacks periodically."""
@@ -384,7 +385,6 @@ class FaceGui(QWidget):
 if __name__ == '__main__':
     # Add signal handler
     signal.signal(signal.SIGINT, sigint_handler)
-
     app = QApplication(sys.argv)
 
     # Use a QTimer to periodically process signals (allows Ctrl+C to be caught)

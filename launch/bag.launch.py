@@ -1,5 +1,5 @@
 #
-# Copyright 2023 BobRos
+# Copyright 2026 BobRos
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,15 +15,16 @@
 #
 
 import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
-from ament_index_python.packages import get_package_share_directory
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
-
+    """Generate launch description for the bag playback node."""
     # use config file if provided
     launch_config_yaml = DeclareLaunchArgument(
         'config_yaml',
@@ -46,7 +47,7 @@ def generate_launch_description():
         launch_ns,
         launch_bag,
         Node(
-            package='rosface',
+            package='bob_face',
             executable='bag',
             name='bag',
             namespace=LaunchConfiguration('ns'),

@@ -22,15 +22,16 @@ based on activity on the spoken_text topic or speaking_flag.
 """
 
 import os
-import sys
-import yaml
 import random
+import sys
+
 import rclpy
-from rclpy.node import Node
-from rcl_interfaces.msg import ParameterDescriptor, ParameterType
-from std_msgs.msg import String, Bool
-from bob_msgs.srv import SetSequence
+import yaml
 from ament_index_python.packages import get_package_share_directory
+from bob_msgs.srv import SetSequence
+from rcl_interfaces.msg import ParameterDescriptor, ParameterType
+from rclpy.node import Node
+from std_msgs.msg import Bool, String
 
 
 class MotionNode(Node):
@@ -46,9 +47,13 @@ class MotionNode(Node):
         super().__init__('motion_node')
 
         # Declare parameters
+        default_config = os.path.join(
+            get_package_share_directory('bob_face'),
+            'config', 'sequences.yaml'
+        )
         self.declare_parameter(
             'sequences_config',
-            os.path.join(get_package_share_directory('bob_face'), 'config', 'sequences.yaml'),
+            default_config,
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='Path to the sequences YAML configuration.'
@@ -64,8 +69,8 @@ class MotionNode(Node):
             )
         )
 
-        self.get_logger().info(
-            f"Using speed: {self.get_parameter('seconds_per_char').value} s/char")
+        speed = self.get_parameter('seconds_per_char').value
+        self.get_logger().info(f"Using speed: {speed} s/char")
 
         self.declare_parameter(
             'min_idle_duration',
@@ -117,8 +122,10 @@ class MotionNode(Node):
 
         # Communication
         self.client = self.create_client(SetSequence, 'set_sequence')
-        self.sub_spoken = self.create_subscription(String, 'spoken_text', self.spoken_callback, 10)
-        self.sub_flag = self.create_subscription(Bool, 'speaking_flag', self.flag_callback, 10)
+        self.sub_spoken = self.create_subscription(
+            String, 'spoken_text', self.spoken_callback, 10)
+        self.sub_flag = self.create_subscription(
+            Bool, 'speaking_flag', self.flag_callback, 10)
 
         # Start initial idle behavior
         self.start_idle_timer()
@@ -139,15 +146,14 @@ class MotionNode(Node):
         if msg.data:
             self.is_speaking = True
             self.stop_timers()
-            self.trigger_sequence(random.choice(self.speaking_pool))
+            if self.speaking_pool:
+                self.trigger_sequence(random.choice(self.speaking_pool))
         else:
             self.stop_speaking_callback()
 
     def spoken_callback(self, msg: String):
         """
         Trigger speaking state based on incoming text (Heuristic mode).
-
-        This logic is only used if no publishers are detected on speaking_flag.
 
         :param msg: String message containing spoken text.
         """
@@ -162,15 +168,17 @@ class MotionNode(Node):
 
         # Calculate duration
         duration = len(msg.data) * self.get_parameter('seconds_per_char').value
+        text_preview = msg.data[:20]
         self.get_logger().info(
-            f"Speaking detected (heuristic): '{msg.data[:20]}...' "
+            f"Speaking detected: '{text_preview}...' "
             f"(Estimated duration: {duration:.2f}s)")
 
         self.is_speaking = True
         self.stop_timers()
 
         # Call service with random speaking sequence
-        self.trigger_sequence(random.choice(self.speaking_pool))
+        if self.speaking_pool:
+            self.trigger_sequence(random.choice(self.speaking_pool))
 
         # Set timer to return to idle
         self.current_timer = self.create_timer(duration, self.stop_speaking_callback)
@@ -223,10 +231,10 @@ class MotionNode(Node):
                     self.idle_pool.append(seq)
 
         if not self.speaking_pool:
-            self.get_logger().warn("Speaking pool is empty! Using first sequence as fallback.")
+            self.get_logger().warn("Speaking pool is empty! Using fallback.")
             self.speaking_pool = [self.all_sequences[0]]
         if not self.idle_pool:
-            self.get_logger().warn("Idle pool is empty! Using all sequences as fallback.")
+            self.get_logger().warn("Idle pool is empty! Using all as fallback.")
             self.idle_pool = self.all_sequences
 
         self.get_logger().info(
@@ -246,7 +254,8 @@ class MotionNode(Node):
             return
 
         # Trigger one now
-        self.trigger_sequence(random.choice(self.idle_pool))
+        if self.idle_pool:
+            self.trigger_sequence(random.choice(self.idle_pool))
 
         # Schedule next
         wait = random.uniform(
@@ -260,7 +269,8 @@ class MotionNode(Node):
         if self.is_speaking:
             return
 
-        self.trigger_sequence(random.choice(self.idle_pool))
+        if self.idle_pool:
+            self.trigger_sequence(random.choice(self.idle_pool))
 
         # Reschedule with new random duration
         self.stop_timers()
