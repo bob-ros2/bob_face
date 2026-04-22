@@ -1,0 +1,26 @@
+rosbag2_bagfile_information:
+  version: 5
+  storage_identifier: sqlite3
+  duration:
+    nanoseconds: 1021484004342
+  starting_time:
+    nanoseconds_since_epoch: 1701798849785040264
+  message_count: 2069
+  topics_with_message_count:
+    - topic_metadata:
+        name: /face_marker_array
+        type: visualization_msgs/msg/MarkerArray
+        serialization_format: cdr
+        offered_qos_profiles: "- history: 3\n  depth: 0\n  reliability: 1\n  durability: 2\n  deadline:\n    sec: 9223372036\n    nsec: 854775807\n  lifespan:\n    sec: 9223372036\n    nsec: 854775807\n  liveliness: 1\n  liveliness_lease_duration:\n    sec: 9223372036\n    nsec: 854775807\n  avoid_ros_namespace_conventions: false"
+      message_count: 2069
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - face_2023-12-05_17-53-25_0.db3
+  files:
+    - path: face_2023-12-05_17-53-25_0.db3
+      starting_time:
+        nanoseconds_since_epoch: 1701798849785040264
+      duration:
+        nanoseconds: 1021484004342
+      message_count: 2069

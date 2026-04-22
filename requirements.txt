@@ -1,4 +1,7 @@
 PyQt5
 PyYAML
 matplotlib
-vaderSentiment
+onnxruntime
+tokenizers
+numpy<2
+huggingface_hub
