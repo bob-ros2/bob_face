@@ -49,12 +49,12 @@ Standard integration flow:
 
 | Node | Parameter | Default | Description |
 |------|-----------|---------|-------------|
-| `sentiment` | `model_repo` | `Xenova/distilbert-base-multilingual-cased-sentiments-student` | HF repository for the multilingual ONNX model. |
+| `sentiment` | `model_repo` | `Xenova/distilbert-multi...` | HF repository for the multilingual ONNX model. |
 | `sentiment` | `model_dir` | `""` | Local directory for storing/loading the model. |
-| `sentiment` | `sensitivity` | `1.5` | Multiplier for the sentiment score. |
-| `sentiment` | `smooth_alpha` | `0.3` | Smoothing factor (0..1). Lower is slower/smoother. |
-| `sentiment` | `temperature` | `1.0` | Scaling of model output. < 1.0 = more extreme results. |
-| `sentiment` | `buffer_size` | `0` | Context window size. 0 = disables smoothing (immediate response). |
+| `sentiment` | `sensitivity` | `1.5` | Linear multiplier [0.0 to inf]. Typical: 1.0-3.0. |
+| `sentiment` | `smooth_alpha` | `0.3` | Smoothing factor [0.0 to 1.0]. Lower is slower. |
+| `sentiment` | `temperature` | `1.0` | Logit temperature [> 0.0]. < 1.0 = sharp, > 1.0 = flat. |
+| `sentiment` | `buffer_size` | `0` | Buffer size in chars [0 to inf]. 0 = disables smoothing. |
 | `motion_manager`| `seconds_per_char` | `0.07` | Heuristic for speaking duration. |
 | `motion_manager`| `idle_sequences`| `""` | Comma-separated idle sequence names. |
 | `motion_manager`| `speaking_sequences`| `""` | Comma-separated speaking sequence names. |
@@ -64,16 +64,20 @@ Standard integration flow:
 To fine-tune Bob's emotional response, use the following parameters:
 
 ### `temperature` (Logit Scaling)
-The model outputs probabilities for each sentiment class. With `temperature`, you can control the "certainty" of the model:
-*   **< 1.0 (e.g., 0.5):** Makes the results **more extreme**. Bob will switch faster between very happy and very sad. Even subtle nuances will trigger strong color changes.
-*   **> 1.0 (e.g., 2.0):** Makes the results **more neutral**. Bob will stay longer in the middle color range (yellow/orange) and only react extremely to very clear statements.
+The model outputs raw "logits" before converting them to probabilities. `temperature` scales these values:
+*   **Range: `> 0.0`** (Avoid exactly 0).
+*   **`0.1` to `0.7`**: High contrast. Bob becomes very "opinionated," quickly reaching deep red or bright green.
+*   **`1.0`**: Default behavior of the model.
+*   **`1.5` to `5.0`**: "Calm" mode. Responses flatten out, keeping Bob mostly in the yellow/orange (neutral) zone.
 
 ### `sensitivity`
-This is a linear multiplier applied after the score calculation. It helps utilize the full range (0..1) if the model provides conservative estimates.
+A linear secondary boost. While temperature changes the model's certainty, sensitivity simply stretches the final result.
+*   **Range: `>= 0.0`**.
+*   If Bob is still too "pale" even with low temperature, increase this to `2.0` or `3.0`.
 
 ### `smooth_alpha` & `buffer_size`
-*   **`buffer_size := 0`**: Completely disables smoothing. Bob reacts **immediately** to the current sentence. Ideal for direct testing and fast interaction.
-*   **`buffer_size > 0`**: Enables a moving average (Leaky Integrator). Bob "remembers" the mood of the last few sentences. `smooth_alpha` determines how quickly new input affects the current mood.
+*   **Instant Burst (`buffer_size := 0`)**: Disables the Leaky Integrator. Bob reacts to every single sentence immediately.
+*   **Atmospheric Mood (`buffer_size > 0`)**: Enables a moving average. Bob maintains a "mood" based on the last `X` characters. `smooth_alpha` determines the inertia (e.g., `0.1` is very slow/stable, `0.9` is fast).
 
 ## Requirements
 - Python: `onnxruntime`, `tokenizers`, `matplotlib`, `PyQt5`, `PyYAML`, `numpy<2`

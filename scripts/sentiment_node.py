@@ -76,7 +76,7 @@ class SentimentNode(Node):
             float(os.environ.get('SENTIMENT_SMOOTH_ALPHA', '0.3')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Smooth factor (0..1). (Env: SENTIMENT_SMOOTH_ALPHA)'
+                description='Smoothing factor [0.0 to 1.0]. Lower = slower reaction. (Env: SENTIMENT_SMOOTH_ALPHA)'
             )
         )
 
@@ -85,7 +85,7 @@ class SentimentNode(Node):
             float(os.environ.get('SENTIMENT_SENSITIVITY', '1.5')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Sentiment multiplier. (Env: SENTIMENT_SENSITIVITY)'
+                description='Linear multiplier [0.0 to inf]. Typical: 1.0-3.0. (Env: SENTIMENT_SENSITIVITY)'
             )
         )
 
@@ -94,7 +94,7 @@ class SentimentNode(Node):
             int(os.environ.get('SENTIMENT_BUFFER_SIZE', '0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_INTEGER,
-                description='Window for context. 0 = direct. (Env: SENTIMENT_BUFFER_SIZE)'
+                description='Text buffer size chars [0 to inf]. 0 = disable smoothing. (Env: SENTIMENT_BUFFER_SIZE)'
             )
         )
 
@@ -103,7 +103,7 @@ class SentimentNode(Node):
             float(os.environ.get('SENTIMENT_TEMPERATURE', '1.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Logit temperature. Lower = more extreme. (Env: SENTIMENT_TEMPERATURE)'
+                description='Logit temperature [> 0.0]. < 1.0 = sharp, > 1.0 = flat. (Env: SENTIMENT_TEMPERATURE)'
             )
         )
 
