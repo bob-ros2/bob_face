@@ -10,6 +10,7 @@ WORKDIR ${ROS_WS}
 RUN apt-get update && apt-get install -y \
     git \
     python3-pip \
+    python3-pyqt5 \
     ros-${ROS_DISTRO}-visualization-msgs \
     ros-${ROS_DISTRO}-std-msgs \
     ros-${ROS_DISTRO}-rosbag2-cpp \

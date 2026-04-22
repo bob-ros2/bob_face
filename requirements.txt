@@ -1,7 +1,8 @@
-PyQt5
 PyYAML
 matplotlib
 onnxruntime
 tokenizers
 numpy<2
 huggingface_hub
+matplotlib
+pyyaml
