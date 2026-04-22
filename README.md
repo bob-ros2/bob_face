@@ -49,31 +49,31 @@ Standard integration flow:
 
 | Node | Parameter | Default | Description |
 |------|-----------|---------|-------------|
-| `sentiment` | `model_repo` | `Xenova/distilbert-base-uncased-finetuned-sst-2-english` | HF-Repository für das ONNX-Modell. |
-| `sentiment` | `model_dir` | `""` | Lokales Verzeichnis zum Speichern/Laden des Modells. |
-| `sentiment` | `sensitivity` | `1.5` | Multiplikator für den Sentiment-Score. |
-| `sentiment` | `smooth_alpha` | `0.3` | Glättungsfaktor (0..1). Niedriger = träger. |
-| `sentiment` | `temperature` | `1.0` | Skalierung der Modell-Ausgabe. < 1.0 = extremer. |
-| `sentiment` | `buffer_size` | `0` | Fenstergröße für Kontext. 0 = deaktiviert Smoothing. |
-| `motion_manager`| `seconds_per_char` | `0.07` | Heuristic for speaking duration. (Env: MOTION_SECONDS_PER_CHAR) |
+| `sentiment` | `model_repo` | `Xenova/distilbert-base-multilingual-cased-sentiments-student` | HF repository for the multilingual ONNX model. |
+| `sentiment` | `model_dir` | `""` | Local directory for storing/loading the model. |
+| `sentiment` | `sensitivity` | `1.5` | Multiplier for the sentiment score. |
+| `sentiment` | `smooth_alpha` | `0.3` | Smoothing factor (0..1). Lower is slower/smoother. |
+| `sentiment` | `temperature` | `1.0` | Scaling of model output. < 1.0 = more extreme results. |
+| `sentiment` | `buffer_size` | `0` | Context window size. 0 = disables smoothing (immediate response). |
+| `motion_manager`| `seconds_per_char` | `0.07` | Heuristic for speaking duration. |
 | `motion_manager`| `idle_sequences`| `""` | Comma-separated idle sequence names. |
 | `motion_manager`| `speaking_sequences`| `""` | Comma-separated speaking sequence names. |
 
 ## Sentiment Tuning
 
-Um das Verhalten von Bob's Stimmung optimal anzupassen, stehen folgende Parameter zur Verfügung:
+To fine-tune Bob's emotional response, use the following parameters:
 
 ### `temperature` (Logit Scaling)
-Das Modell gibt Wahrscheinlichkeiten aus. Mit der `temperature` kannst du steuern, wie "sicher" sich das Modell sein soll:
-*   **< 1.0 (z.B. 0.5):** Macht die Ergebnisse **extremer**. Bob wechselt schneller zwischen sehr glücklich und sehr traurig. Kleiner Nuancen führen bereits zu starken Farbausschlägen.
-*   **> 1.0 (z.B. 2.0):** Macht die Ergebnisse **neutraler**. Bob bleibt länger im mittleren Farbbereich (gelb/orange) und reagiert nur auf sehr eindeutige Aussagen extrem.
+The model outputs probabilities for each sentiment class. With `temperature`, you can control the "certainty" of the model:
+*   **< 1.0 (e.g., 0.5):** Makes the results **more extreme**. Bob will switch faster between very happy and very sad. Even subtle nuances will trigger strong color changes.
+*   **> 1.0 (e.g., 2.0):** Makes the results **more neutral**. Bob will stay longer in the middle color range (yellow/orange) and only react extremely to very clear statements.
 
 ### `sensitivity`
-Dies ist ein linearer Multiplikator, der nach der Berechnung des Scores angewendet wird. Er hilft dabei, den Wertebereich (0..1) voll auszunutzen, falls das Modell zu konservative Schätzungen abgibt.
+This is a linear multiplier applied after the score calculation. It helps utilize the full range (0..1) if the model provides conservative estimates.
 
 ### `smooth_alpha` & `buffer_size`
-*   **`buffer_size := 0`**: Deaktiviert die Glättung komplett. Bob reagiert **sofort** auf den aktuellen Satz. Ideal für direkte Interaktion.
-*   **`buffer_size > 0`**: Aktiviert einen gleitenden Durchschnitt (Leaky Integrator). Bob "merkt" sich die Stimmung der letzten Sätze. `smooth_alpha` bestimmt dabei, wie schnell neue Sätze die aktuelle Stimmung beeinflussen.
+*   **`buffer_size := 0`**: Completely disables smoothing. Bob reacts **immediately** to the current sentence. Ideal for direct testing and fast interaction.
+*   **`buffer_size > 0`**: Enables a moving average (Leaky Integrator). Bob "remembers" the mood of the last few sentences. `smooth_alpha` determines how quickly new input affects the current mood.
 
 ## Requirements
 - Python: `onnxruntime`, `tokenizers`, `matplotlib`, `PyQt5`, `PyYAML`, `numpy<2`
