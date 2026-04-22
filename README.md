@@ -1,4 +1,5 @@
 # ROS Package [bob_face](https://github.com/bob-ros2/bob_face)
+[![CI](https://github.com/bob-ros2/bob_face/actions/workflows/ros2_ci.yaml/badge.svg)](https://github.com/bob-ros2/bob_face/actions/workflows/ros2_ci.yaml)
 
 ROS 2 package for facial animation playback and sentiment-driven color orchestration.
 

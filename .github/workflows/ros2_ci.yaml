@@ -1,0 +1,38 @@
+name: ROS 2 CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container:
+      image: ros:humble-ros-base
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y python3-colcon-common-extensions
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y
+
+      - name: Build
+        run: |
+          . /opt/ros/humble/setup.sh
+          colcon build --packages-select bob_face \
+            --build-base ../build \
+            --install-base ../install
+
+      - name: Test
+        run: |
+          . /opt/ros/humble/setup.sh
+          colcon test --packages-select bob_face \
+            --build-base ../build \
+            --install-base ../install
+          colcon test-result --test-result-base ../build --all --verbose
