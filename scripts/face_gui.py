@@ -26,6 +26,7 @@ import signal
 import sys
 
 import rclpy
+from rclpy.node import Node
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
