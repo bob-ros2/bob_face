@@ -75,9 +75,13 @@ A linear secondary boost. While temperature changes the model's certainty, sensi
 *   **Range: `>= 0.0`**.
 *   If Bob is still too "pale" even with low temperature, increase this to `2.0` or `3.0`.
 
-### `smooth_alpha` & `buffer_size`
-*   **Instant Burst (`buffer_size := 0`)**: Disables the Leaky Integrator. Bob reacts to every single sentence immediately.
-*   **Atmospheric Mood (`buffer_size > 0`)**: Enables a moving average. Bob maintains a "mood" based on the last `X` characters. `smooth_alpha` determines the inertia (e.g., `0.1` is very slow/stable, `0.9` is fast).
+**Example (Input score 0.55 - slightly positive):**
+| Sensitivity | Calculation | Final Score | Result |
+| :--- | :--- | :--- | :--- |
+| 1.0 | `0.5 + (0.05 * 1)` | 0.55 | Pale Yellow |
+| 2.0 | `0.5 + (0.05 * 2)` | 0.60 | Yellow-Green |
+| 5.0 | `0.5 + (0.05 * 5)` | 0.75 | **Strong Green** |
+| 10.0| `0.5 + (0.05 * 10)`| 1.00 | **Bright Green** |
 
 ## Requirements
 - Python: `onnxruntime`, `tokenizers`, `matplotlib`, `PyQt5`, `PyYAML`, `numpy<2`
