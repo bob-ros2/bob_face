@@ -91,7 +91,10 @@ Different models have different "personalities" and label orders. We verified th
 ## Installation & Build
 
 ### Docker (Recommended)
-Official Docker images are available for both **amd64** and **arm64** via GitHub Container Registry. Use these for stable, dependency-free deployment:
+Official Docker images are available for both **amd64** and **arm64** via GitHub Container Registry. 
+View available versions here: [ghcr.io/bob-ros2/bob-face](https://github.com/bob-ros2/bob_face/pkgs/container/bob-face)
+
+To pull the latest image:
 ```bash
 docker pull ghcr.io/bob-ros2/bob-face:latest
 ```
