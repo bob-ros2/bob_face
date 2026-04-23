@@ -249,9 +249,9 @@ class SentimentNode(Node):
         probs = exp_logits / exp_logits.sum()
 
         # Mapping for Xenova/twitter-xlm-roberta-base-sentiment-multilingual
-        # id2label: {0: "negative", 1: "neutral", 2: "positive"}
+        # Verified Label Order: {0: "positive", 1: "neutral", 2: "negative"}
         # Target score: positive=1.0, neutral=0.5, negative=0.0
-        new_score = (probs[2] * 1.0) + (probs[1] * 0.5) + (probs[0] * 0.0)
+        new_score = (probs[0] * 1.0) + (probs[1] * 0.5) + (probs[2] * 0.0)
 
         # Apply Sensitivity and Clipping
         compound = (new_score * 2.0) - 1.0
