@@ -88,14 +88,43 @@ Different models have different "personalities" and label orders. We verified th
 - Python: `onnxruntime`, `tokenizers`, `matplotlib`, `PyQt5`, `PyYAML`, `numpy<2`
 - ROS 2: `rclcpp`, `rclpy`, `visualization_msgs`, `bob_msgs`
 
-## Quick Start
+## Installation & Build
+
+### Docker (Recommended)
+Official Docker images are available via GitHub Container Registry. Use these for stable, dependency-free deployment:
 ```bash
-# Install Python deps
-pip install -r requirements.txt
+docker pull ghcr.io/bob-ros2/bob-face:latest
+```
 
-# Launch system
+### Manual Workspace Build
+If you want to build from source in your ROS 2 workspace:
+
+1. **Clone the repository**:
+   ```bash
+   cd ~/ros2_ws/src
+   git clone https://github.com/bob-ros2/bob_face.git
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   cd ~/ros2_ws
+   rosdep install --from-paths src --ignore-src -r -y
+   # Install additional python dependencies
+   pip install -r src/bob_face/requirements.txt
+1. 
+3. **Build**:
+   ```bash
+   colcon build --packages-select bob_face
+   source install/setup.bash
+   ```
+
+## Usage
+Launch the face system using a configuration file (e.g., from `bob_launch`):
+```bash
 ros2 launch bob_launch generic.launch.py config:=face.yaml
+```
 
-# Test Sentiment
-ros2 topic pub /bob/analize std_msgs/msg/String "{data: 'Excellent work'}" -1
+To manually trigger a sentiment update for testing:
+```bash
+ros2 topic pub /bob/analize std_msgs/msg/String "{data: 'Bob, the sun is rising in pastel colors!'}" -1
 ```
