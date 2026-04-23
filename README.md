@@ -49,7 +49,7 @@ Standard integration flow:
 
 | Node | Parameter | Default | Description |
 |------|-----------|---------|-------------|
-| `sentiment` | `model_repo` | `Xenova/distilbert-multi...` | HF repository for the multilingual ONNX model. |
+| `sentiment` | `model_repo` | `Xenova/twitter-xlm-roberta-base-sentiment-multilingual` | Powerful multilingual model (better context than DistilBERT). |
 | `sentiment` | `model_dir` | `""` | Local directory for storing/loading the model. |
 | `sentiment` | `sensitivity` | `1.5` | Linear multiplier [0.0 to inf]. Typical: 1.0-3.0. |
 | `sentiment` | `smooth_alpha` | `0.3` | Smoothing factor [0.0 to 1.0]. Lower is slower. |

@@ -43,7 +43,7 @@ class SentimentNode(Node):
         super().__init__('sentiment')
 
         # Declare Parameters
-        default_repo = 'Xenova/distilbert-base-multilingual-cased-sentiments-student'
+        default_repo = 'Xenova/twitter-xlm-roberta-base-sentiment-multilingual'
         self.declare_parameter(
             'model_repo',
             os.environ.get('SENTIMENT_MODEL_REPO', default_repo),
@@ -248,10 +248,10 @@ class SentimentNode(Node):
         exp_logits = np.exp(logits - np.max(logits))
         probs = exp_logits / exp_logits.sum()
 
-        # Mapping for Xenova/distilbert-base-multilingual-cased-sentiments-student
-        # id2label: {0: "positive", 1: "neutral", 2: "negative"}
+        # Mapping for Xenova/twitter-xlm-roberta-base-sentiment-multilingual
+        # id2label: {0: "negative", 1: "neutral", 2: "positive"}
         # Target score: positive=1.0, neutral=0.5, negative=0.0
-        new_score = (probs[0] * 1.0) + (probs[1] * 0.5) + (probs[2] * 0.0)
+        new_score = (probs[2] * 1.0) + (probs[1] * 0.5) + (probs[0] * 0.0)
 
         # Apply Sensitivity and Clipping
         compound = (new_score * 2.0) - 1.0
