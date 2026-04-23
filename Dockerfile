@@ -38,5 +38,8 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc && \
     echo "source ${ROS_WS}/install/setup.bash" >> /etc/bash.bashrc
 
-# Default command
+# ENTRYPOINT sources ROS and workspace setup
+ENTRYPOINT ["/bin/bash", "-c", "source /opt/ros/$ROS_DISTRO/setup.bash && source $ROS_WS/install/setup.bash && exec \"$@\"", "bash"]
+
+# Default command if no arguments are provided
 CMD ["bash"]
