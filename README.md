@@ -91,7 +91,7 @@ Different models have different "personalities" and label orders. We verified th
 ## Installation & Build
 
 ### Docker (Recommended)
-Official Docker images are available via GitHub Container Registry. Use these for stable, dependency-free deployment:
+Official Docker images are available for both **amd64** and **arm64** via GitHub Container Registry. Use these for stable, dependency-free deployment:
 ```bash
 docker pull ghcr.io/bob-ros2/bob-face:latest
 ```
@@ -111,20 +111,10 @@ If you want to build from source in your ROS 2 workspace:
    rosdep install --from-paths src --ignore-src -r -y
    # Install additional python dependencies
    pip install -r src/bob_face/requirements.txt
-1. 
+   ```
+
 3. **Build**:
    ```bash
    colcon build --packages-select bob_face
    source install/setup.bash
    ```
-
-## Usage
-Launch the face system using a configuration file (e.g., from `bob_launch`):
-```bash
-ros2 launch bob_launch generic.launch.py config:=face.yaml
-```
-
-To manually trigger a sentiment update for testing:
-```bash
-ros2 topic pub /bob/analize std_msgs/msg/String "{data: 'Bob, the sun is rising in pastel colors!'}" -1
-```
