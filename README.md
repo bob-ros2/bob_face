@@ -40,7 +40,7 @@ Interactive sequence editor and manual control.
 - **Services**: `set_sequence` (Client)
 - **Files**: Reads/Writes `config/sequences.yaml`
 
-## Configuration (face.yaml)
+## Configuration
 Standard integration flow:
 `bag` (out: `marker_array_raw`) -> `face_marker` (in: `marker_array_raw`, out: `marker_array`) -> `face_gui` & RViz.
 
