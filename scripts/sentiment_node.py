@@ -38,6 +38,7 @@ from tokenizers import Tokenizer
 class SentimentNode(Node):
     """
     ROS 2 Node for sentiment analysis using ONNX models.
+
     Provides color feedback and scores based on input text.
     """
 
