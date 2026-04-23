@@ -25,10 +25,10 @@ import os
 import time
 
 import huggingface_hub
-import numpy as np
 from matplotlib import colormaps
+import numpy as np
 import onnxruntime as ort
-from rcl_interfaces.msg import ParameterDescriptor, ParameterType
+from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import ColorRGBA, Float32, String
@@ -36,7 +36,10 @@ from tokenizers import Tokenizer
 
 
 class SentimentNode(Node):
-    """ROS 2 Node for real-time sentiment analysis using ONNX TinyBERT."""
+    """
+    ROS 2 Node for sentiment analysis using ONNX models.
+    Provides color feedback and scores based on input text.
+    """
 
     def __init__(self):
         """Initialize the node, parameters, and download/load the model."""
@@ -47,64 +50,37 @@ class SentimentNode(Node):
         self.declare_parameter(
             'model_repo',
             os.environ.get('SENTIMENT_MODEL_REPO', default_repo),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_STRING,
-                description='HuggingFace repo for multilingual ONNX model.'
-            )
+            ParameterDescriptor(description='HF repository for the multilingual ONNX model.')
         )
-
         self.declare_parameter(
             'model_dir',
             os.environ.get('SENTIMENT_MODEL_DIR', ''),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_STRING,
-                description='Local dir for model storage. (Env: SENTIMENT_MODEL_DIR)'
-            )
+            ParameterDescriptor(description='Local dir for model storage.')
         )
-
         self.declare_parameter(
             'cmap_name',
-            os.environ.get('SENTIMENT_CMAP_NAME', 'plasma'),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_STRING,
-                description='Matplotlib colormap name. (Env: SENTIMENT_CMAP_NAME)'
-            )
+            os.environ.get('SENTIMENT_CMAP_NAME', 'RdYlGn'),
+            ParameterDescriptor(description='Matplotlib colormap (e.g., RdYlGn, jet, hsv)')
         )
-
-        self.declare_parameter(
-            'smooth_alpha',
-            float(os.environ.get('SENTIMENT_SMOOTH_ALPHA', '0.3')),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_DOUBLE,
-                description='Smoothing factor [0.0 to 1.0]. Lower = slower reaction. (Env: SENTIMENT_SMOOTH_ALPHA)'
-            )
-        )
-
         self.declare_parameter(
             'sensitivity',
-            float(os.environ.get('SENTIMENT_SENSITIVITY', '1.5')),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_DOUBLE,
-                description='Linear multiplier [0.0 to inf]. Typical: 1.0-3.0. (Env: SENTIMENT_SENSITIVITY)'
-            )
+            float(os.environ.get('SENTIMENT_SENSITIVITY', 2.5)),
+            ParameterDescriptor(description='Multiplier (spread). Typical 1.0-3.0.')
         )
-
         self.declare_parameter(
-            'buffer_size',
-            int(os.environ.get('SENTIMENT_BUFFER_SIZE', '0')),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_INTEGER,
-                description='Text buffer size chars [0 to inf]. 0 = disable smoothing. (Env: SENTIMENT_BUFFER_SIZE)'
-            )
+            'smooth_alpha',
+            float(os.environ.get('SENTIMENT_SMOOTH_ALPHA', 0.5)),
+            ParameterDescriptor(description='Alpha [0..1]. Lower = slower reaction.')
         )
-
         self.declare_parameter(
             'temperature',
-            float(os.environ.get('SENTIMENT_TEMPERATURE', '1.0')),
-            ParameterDescriptor(
-                type=ParameterType.PARAMETER_DOUBLE,
-                description='Logit temperature [> 0.0]. < 1.0 = sharp, > 1.0 = flat. (Env: SENTIMENT_TEMPERATURE)'
-            )
+            float(os.environ.get('SENTIMENT_TEMPERATURE', 1.0)),
+            ParameterDescriptor(description='Logit scaling [>0]. <1 makes Bob extreme.')
+        )
+        self.declare_parameter(
+            'buffer_size',
+            int(os.environ.get('SENTIMENT_BUFFER_SIZE', 80)),
+            ParameterDescriptor(description='Buffer chars [0=instant, >0=mood]')
         )
 
         # Internal state
@@ -293,6 +269,7 @@ class SentimentNode(Node):
 
 
 def main(args=None):
+    """Entry point for the sentiment node."""
     rclpy.init(args=args)
     node = SentimentNode()
     try:
@@ -301,8 +278,7 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

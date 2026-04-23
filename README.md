@@ -49,39 +49,41 @@ Standard integration flow:
 
 | Node | Parameter | Default | Description |
 |------|-----------|---------|-------------|
-| `sentiment` | `model_repo` | `Xenova/twitter-xlm-roberta-base-sentiment-multilingual` | Powerful multilingual model (better context than DistilBERT). |
+| `sentiment` | `model_repo` | `Xenova/twitter-xlm-roberta-base-sentiment-multilingual` | Powerful multilingual model (default). |
 | `sentiment` | `model_dir` | `""` | Local directory for storing/loading the model. |
-| `sentiment` | `sensitivity` | `1.5` | Linear multiplier [0.0 to inf]. Typical: 1.0-3.0. |
-| `sentiment` | `smooth_alpha` | `0.3` | Smoothing factor [0.0 to 1.0]. Lower is slower. |
-| `sentiment` | `temperature` | `1.0` | Logit temperature [> 0.0]. < 1.0 = sharp, > 1.0 = flat. |
-| `sentiment` | `buffer_size` | `0` | Buffer size in chars [0 to inf]. 0 = disables smoothing. |
-| `motion_manager`| `seconds_per_char` | `0.07` | Heuristic for speaking duration. |
-| `motion_manager`| `idle_sequences`| `""` | Comma-separated idle sequence names. |
-| `motion_manager`| `speaking_sequences`| `""` | Comma-separated speaking sequence names. |
+| `sentiment` | `sensitivity` | `2.5` | Linear multiplier (spread). Typical 1.0-3.0. |
+| `sentiment` | `smooth_alpha` | `0.5` | Smoothing factor [0.0 to 1.0]. |
+| `sentiment` | `temperature` | `1.0` | Logit scaling [> 0.0]. |
+| `sentiment` | `buffer_size` | `80` | Character buffer [0 = instant, > 0 = context]. |
+| `sentiment` | `cmap_name` | `RdYlGn` | Matplotlib colormap (Red-Yellow-Green). |
 
-## Sentiment Tuning
+## Sentiment Tuning (Lessons Learned)
 
-To fine-tune Bob's emotional response, use the following parameters:
+Through extensive testing with the **Bob Face** interface, we found the following "sweet spot" settings for a natural conversational experience:
 
-### `temperature` (Logit Scaling)
-The model outputs raw "logits" before converting them to probabilities. `temperature` scales these values:
-*   **Range: `> 0.0`** (Avoid exactly 0).
-*   **`0.1` to `0.7`**: High contrast. Bob becomes very "opinionated," quickly reaching deep red or bright green.
-*   **`1.0`**: Default behavior of the model.
-*   **`1.5` to `5.0`**: "Calm" mode. Responses flatten out, keeping Bob mostly in the yellow/orange (neutral) zone.
+### 1. The "Mood" Persistence (Buffer & Smoothing)
+*   **The Buffer Problem**: A large buffer (`> 150` chars) acts as emotional memory. If Bob hears something deeply negative, he stays "sad" for several sentences until the negative text is pushed out.
+*   **Recommendation**: Use **`buffer_size := 80`** (approx. one sentence). This allows Bob to maintain a "current mood" while still being responsive to the next input.
+*   **Inertia**: Use **`smooth_alpha := 0.5`**. This mimics human emotion—we don't change from happy to sad in a millisecond, but it shouldn't take minutes either.
 
-### `sensitivity`
-A linear secondary boost. While temperature changes the model's certainty, sensitivity simply stretches the final result.
-*   **Range: `>= 0.0`**.
-*   If Bob is still too "pale" even with low temperature, increase this to `2.0` or `3.0`.
+### 2. Clarity vs. Neutrality (Temperature)
+*   **Keyword Bias**: Models can be "scared" by words like *Asthma* or *Symptom*, even in a positive context. 
+*   **Recommendation**: Use **`temperature := 1.0`**. Going lower (e.g., `0.4`) makes Bob more "extreme" and sensitive to keywords, while higher values (e.g., `1.5`) make him more unshakeable/neutral.
 
-**Example (Input score 0.55 - slightly positive):**
-| Sensitivity | Calculation | Final Score | Result |
-| :--- | :--- | :--- | :--- |
-| 1.0 | `0.5 + (0.05 * 1)` | 0.55 | Pale Yellow |
-| 2.0 | `0.5 + (0.05 * 2)` | 0.60 | Yellow-Green |
-| 5.0 | `0.5 + (0.05 * 5)` | 0.75 | **Strong Green** |
-| 10.0| `0.5 + (0.05 * 10)`| 1.00 | **Bright Green** |
+### 3. Stretching the Spectrum (Sensitivity)
+*   If Bob stays too "pale" (yellow) despite positive/negative input, increase **`sensitivity`** to **`2.5` - `3.0`**. This stretches the internal score away from the center towards the vibrant Red/Green edges of the colormap.
+
+## Model Choice & Alternatives
+
+Different models have different "personalities" and label orders. We verified the following:
+
+1.  **[XLM-RoBERTa (Default)](https://huggingface.co/Xenova/twitter-xlm-roberta-base-sentiment-multilingual)**: 
+    *   **Label Order**: `0: Positive`, `1: Neutral`, `2: Negative`.
+    *   **Pros**: Excellent nuanced understanding of German and English. Less prone to trivial keyword triggers. Recommended for complex dialogue.
+2.  **[DistilBERT Multilingual](https://huggingface.co/Xenova/distilbert-base-multilingual-cased-sentiments-student)**:
+    *   **Label Order**: `0: Positive`, `1: Neutral`, `2: Negative`.
+    *   **Pros**: Very fast, light-weight.
+    *   **Cons**: Higher "Keyword Bias" (e.g., gets scared easily by medical/technical terms regardless of context).
 
 ## Requirements
 - Python: `onnxruntime`, `tokenizers`, `matplotlib`, `PyQt5`, `PyYAML`, `numpy<2`
