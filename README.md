@@ -29,7 +29,6 @@ Text-to-color mapping.
 - **Subscribes**: `analize` (`std_msgs/String`)
 - **Publishes**: `face_color_override` (`std_msgs/ColorRGBA`), `sentiment_score` (`std_msgs/Float32`)
 - **Engine**: ONNX Runtime (TinyBERT)
-- **Parameters**: `model_repo`, `sensitivity`, `smooth_alpha`
 
 ### `motion_manager` (Node)
 Automation of facial states (Speaking/Idle).
