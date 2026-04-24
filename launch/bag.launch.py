@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 
+"""Generate launch description for the bag playback node."""
+
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -29,8 +31,8 @@ def generate_launch_description():
     launch_config_yaml = DeclareLaunchArgument(
         'config_yaml',
         default_value=os.path.join(
-            get_package_share_directory("bob_face"),
-            "config", "bag.yaml"))
+            get_package_share_directory('bob_face'),
+            'config', 'bag.yaml'))
 
     # used namespace
     launch_ns = DeclareLaunchArgument(
@@ -58,9 +60,9 @@ def generate_launch_description():
             output='screen'
         ),
         Node(
-            package="tf2_ros",
-            name="tf_map_2_face",
-            executable="static_transform_publisher",
-            arguments=["0.0", "0.0", "1.5", "0", "0", "0", "map", "face"]
+            package='tf2_ros',
+            name='tf_map_2_face',
+            executable='static_transform_publisher',
+            arguments=['0.0', '0.0', '1.5', '0', '0', '0', 'map', 'face']
         )
     ])

@@ -51,7 +51,8 @@ class SentimentNode(Node):
         self.declare_parameter(
             'model_repo',
             os.environ.get('SENTIMENT_MODEL_REPO', default_repo),
-            ParameterDescriptor(description='HF repository for the multilingual ONNX model.')
+            ParameterDescriptor(
+                description='HF repository for the multilingual ONNX model.')
         )
         self.declare_parameter(
             'model_dir',
@@ -61,22 +62,26 @@ class SentimentNode(Node):
         self.declare_parameter(
             'cmap_name',
             os.environ.get('SENTIMENT_CMAP_NAME', 'RdYlGn'),
-            ParameterDescriptor(description='Matplotlib colormap (e.g., RdYlGn, jet, hsv)')
+            ParameterDescriptor(
+                description='Matplotlib colormap (e.g., RdYlGn, jet, hsv)')
         )
         self.declare_parameter(
             'sensitivity',
             float(os.environ.get('SENTIMENT_SENSITIVITY', 2.5)),
-            ParameterDescriptor(description='Multiplier (spread). Typical 1.0-3.0.')
+            ParameterDescriptor(
+                description='Multiplier (spread). Typical 1.0-3.0.')
         )
         self.declare_parameter(
             'smooth_alpha',
             float(os.environ.get('SENTIMENT_SMOOTH_ALPHA', 0.5)),
-            ParameterDescriptor(description='Alpha [0..1]. Lower = slower reaction.')
+            ParameterDescriptor(
+                description='Alpha [0..1]. Lower = slower reaction.')
         )
         self.declare_parameter(
             'temperature',
             float(os.environ.get('SENTIMENT_TEMPERATURE', 1.0)),
-            ParameterDescriptor(description='Logit scaling [>0]. <1 makes Bob extreme.')
+            ParameterDescriptor(
+                description='Logit scaling [>0]. <1 makes Bob extreme.')
         )
         self.declare_parameter(
             'buffer_size',
@@ -95,15 +100,17 @@ class SentimentNode(Node):
 
         # Initialize Colormap
         try:
-            name = self.get_parameter('cmap_name').value
-            self.cmap = colormaps[name]
+            p_cmap = self.get_parameter('cmap_name').value
+            self.cmap = colormaps[p_cmap]
         except KeyError:
-            self.get_logger().error(f'Colormap "{name}" not found. Using "plasma".')
+            self.get_logger().error(
+                f'Colormap "{p_cmap}" not found. Using "plasma".')
             self.cmap = colormaps['plasma']
 
         # Setup Pub/Sub
         self.pub_score = self.create_publisher(Float32, 'sentiment_score', 10)
-        self.pub_color = self.create_publisher(ColorRGBA, 'face_color_override', 10)
+        self.pub_color = self.create_publisher(
+            ColorRGBA, 'face_color_override', 10)
 
         self.sub_text = self.create_subscription(
             String,
@@ -112,7 +119,7 @@ class SentimentNode(Node):
             10
         )
 
-        self.get_logger().info('Sentiment Node initialized (Multilingual ONNX).')
+        self.get_logger().info('Sentiment Node initialized (ONNX).')
 
     def load_transformer_model(self):
         """Download and load the ONNX model and tokenizer."""
@@ -130,7 +137,8 @@ class SentimentNode(Node):
         tokenizer_path = None
 
         if local_dir:
-            self.get_logger().info(f'Loading model from local directory: {local_dir}')
+            self.get_logger().info(
+                f'Loading model from local directory: {local_dir}')
             os.makedirs(local_dir, exist_ok=True)
 
             # Try to download/check files
@@ -161,19 +169,23 @@ class SentimentNode(Node):
             self.get_logger().info(f'Loading model from HF cache: {repo}')
             for f in onnx_files:
                 try:
-                    model_path = huggingface_hub.hf_hub_download(repo_id=repo, filename=f)
+                    model_path = huggingface_hub.hf_hub_download(
+                        repo_id=repo, filename=f)
                     break
                 except Exception:
                     continue
-            tokenizer_path = huggingface_hub.hf_hub_download(repo_id=repo, filename=tokenizer_file)
+            tokenizer_path = huggingface_hub.hf_hub_download(
+                repo_id=repo, filename=tokenizer_file)
 
         if not model_path or not os.path.exists(model_path):
-            self.get_logger().fatal('Could not find suitable ONNX model file in the repository.')
+            self.get_logger().fatal(
+                'Could not find suitable ONNX model file in the repository.')
             raise FileNotFoundError('ONNX model file not found.')
 
         try:
             # Load ONNX Session
-            self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+            self.session = ort.InferenceSession(
+                model_path, providers=['CPUExecutionProvider'])
 
             # Load Tokenizer
             self.tokenizer = Tokenizer.from_file(tokenizer_path)
@@ -225,9 +237,6 @@ class SentimentNode(Node):
         exp_logits = np.exp(logits - np.max(logits))
         probs = exp_logits / exp_logits.sum()
 
-        # Mapping for Xenova/twitter-xlm-roberta-base-sentiment-multilingual
-        # Verified Label Order: {0: "positive", 1: "neutral", 2: "negative"}
-        # Target score: positive=1.0, neutral=0.5, negative=0.0
         new_score = (probs[0] * 1.0) + (probs[1] * 0.5) + (probs[2] * 0.0)
 
         # Apply Sensitivity and Clipping
@@ -241,7 +250,8 @@ class SentimentNode(Node):
         # Exponential smoothing (Leaky Integrator)
         if max_buf > 0:
             alpha = self.get_parameter('smooth_alpha').value
-            self.last_score = (alpha * new_score) + ((1.0 - alpha) * self.last_score)
+            self.last_score = (
+                alpha * new_score) + ((1.0 - alpha) * self.last_score)
         else:
             self.last_score = new_score
 
@@ -256,7 +266,8 @@ class SentimentNode(Node):
 
         # Performance measurement and debug logging
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        log_msg = f"In: '{msg.data[:30]}...' -> Score: {self.last_score:.3f} ({elapsed_ms:.2f}ms)"
+        pre = msg.data[:20]
+        log_msg = f"In: '{pre}...' -> Score: {self.last_score:.3f} ({elapsed_ms:.2f}ms)"
         self.get_logger().debug(log_msg)
 
     def publish_color(self, rgba_list):

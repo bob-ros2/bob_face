@@ -2,14 +2,14 @@
 
 # Copyright 2026 BobRos
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the 'License');
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
+# distributed under the License is distributed on an 'AS IS' BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -89,7 +89,7 @@ class FaceGui(QWidget):
                     data = yaml.safe_load(f)
                     self.sequences = data.get('sequences', [])
             except Exception as e:
-                self.node.get_logger().error(f"Error loading config: {e}")
+                self.node.get_logger().error(f'Error loading config: {e}')
 
         self.init_ui()
 
@@ -122,13 +122,13 @@ class FaceGui(QWidget):
         main_layout = QVBoxLayout()
 
         # --- Presets Section ---
-        self.presets_group = QGroupBox("Animation Presets")
+        self.presets_group = QGroupBox('Animation Presets')
         presets_group_layout = QVBoxLayout(self.presets_group)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setMinimumHeight(250)
-        self.scroll_area.setStyleSheet("border: none;")
+        self.scroll_area.setStyleSheet('border: none;')
 
         self.presets_container = QWidget()
         self.presets_layout = QGridLayout(self.presets_container)
@@ -144,8 +144,8 @@ class FaceGui(QWidget):
         # --- Global Controls ---
         ctrl_layout = QHBoxLayout()
 
-        self.rate_label = QLabel("Rate: 30 FPS")
-        self.rate_label.setStyleSheet("font-size: 16px; font-weight: bold; min-width: 120px;")
+        self.rate_label = QLabel('Rate: 30 FPS')
+        self.rate_label.setStyleSheet('font-size: 16px; font-weight: bold; min-width: 120px;')
         ctrl_layout.addWidget(self.rate_label)
 
         self.rate_slider = QSlider(Qt.Horizontal)
@@ -158,37 +158,37 @@ class FaceGui(QWidget):
         main_layout.addLayout(ctrl_layout)
 
         # --- Editor Section ---
-        editor_group = QGroupBox("Sequence Editor")
+        editor_group = QGroupBox('Sequence Editor')
         editor_layout = QGridLayout(editor_group)
 
-        editor_layout.addWidget(QLabel("Name:"), 0, 0)
-        self.edit_name = QLineEdit("New Sequence")
+        editor_layout.addWidget(QLabel('Name:'), 0, 0)
+        self.edit_name = QLineEdit('New Sequence')
         editor_layout.addWidget(self.edit_name, 0, 1, 1, 3)
 
-        editor_layout.addWidget(QLabel("Start:"), 1, 0)
+        editor_layout.addWidget(QLabel('Start:'), 1, 0)
         self.edit_start = QSpinBox()
         self.edit_start.setRange(0, 100000)
         self.edit_start.setValue(500)
         editor_layout.addWidget(self.edit_start, 1, 1)
 
-        editor_layout.addWidget(QLabel("End:"), 1, 2)
+        editor_layout.addWidget(QLabel('End:'), 1, 2)
         self.edit_end = QSpinBox()
         self.edit_end.setRange(0, 100000)
         self.edit_end.setValue(1000)
         editor_layout.addWidget(self.edit_end, 1, 3)
 
-        editor_layout.addWidget(QLabel("Type:"), 2, 0)
+        editor_layout.addWidget(QLabel('Type:'), 2, 0)
         self.edit_type = QSpinBox()
         self.edit_type.setValue(1)
         editor_layout.addWidget(self.edit_type, 2, 1)
 
-        btn_test = QPushButton("Test Live")
-        btn_test.setStyleSheet("background-color: #444; color: #ffeb3b;")
+        btn_test = QPushButton('Test Live')
+        btn_test.setStyleSheet('background-color: #444; color: #ffeb3b;')
         btn_test.clicked.connect(self.test_sequence)
         editor_layout.addWidget(btn_test, 2, 2)
 
-        btn_add = QPushButton("Add to List")
-        btn_add.setStyleSheet("background-color: #2e7d32; color: #fff;")
+        btn_add = QPushButton('Add to List')
+        btn_add.setStyleSheet('background-color: #2e7d32; color: #fff;')
         btn_add.clicked.connect(self.add_sequence)
         editor_layout.addWidget(btn_add, 2, 3)
 
@@ -196,16 +196,16 @@ class FaceGui(QWidget):
 
         # --- Global Actions ---
         actions_layout = QHBoxLayout()
-        btn_save = QPushButton("SAVE CONFIG TO YAML")
-        btn_save.setStyleSheet("background-color: #c62828; color: #fff; "
-                               "font-size: 16px; padding: 15px;")
+        btn_save = QPushButton('SAVE CONFIG TO YAML')
+        btn_save.setStyleSheet('background-color: #c62828; color: #fff; '
+                               'font-size: 16px; padding: 15px;')
         btn_save.clicked.connect(self.save_config)
         actions_layout.addWidget(btn_save)
         main_layout.addLayout(actions_layout)
 
         # --- Status Line ---
-        status_font = "color: #00ff00; font-size: 18px; font-weight: bold;"
-        self.status_label = QLabel("Status: Ready")
+        status_font = 'color: #00ff00; font-size: 18px; font-weight: bold;'
+        self.status_label = QLabel('Status: Ready')
         self.status_label.setStyleSheet(status_font)
         main_layout.addWidget(self.status_label)
 
@@ -235,9 +235,9 @@ class FaceGui(QWidget):
             row_layout.addWidget(btn_play, 4)
 
             # Delete Button
-            btn_del = QPushButton("X")
+            btn_del = QPushButton('X')
             btn_del.setFixedWidth(25)
-            btn_del.setStyleSheet("background-color: #b71c1c; color: white; padding: 2px;")
+            btn_del.setStyleSheet('background-color: #b71c1c; color: white; padding: 2px;')
             btn_del.clicked.connect(lambda checked, idx=i: self.delete_sequence(idx))
             row_layout.addWidget(btn_del, 1)
 
@@ -255,7 +255,7 @@ class FaceGui(QWidget):
 
     def update_rate_label(self, value):
         """Update the rate label text when the slider value changes."""
-        self.rate_label.setText(f"Rate: {value} FPS")
+        self.rate_label.setText(f'Rate: {value} FPS')
 
     def preset_clicked(self, seq_dict):
         """Populate editor and play sequence."""
@@ -270,8 +270,8 @@ class FaceGui(QWidget):
     def call_service(self, seq_dict):
         """Send a SetSequence service request to the face node."""
         if not self.client.wait_for_service(timeout_sec=1.0):
-            style = "color: #ff4444; font-size: 18px; font-weight: bold;"
-            self.status_label.setText("Status: Service /set_sequence not available!")
+            style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
+            self.status_label.setText('Status: Service /set_sequence not available!')
             self.status_label.setStyleSheet(style)
             return
 
@@ -281,7 +281,7 @@ class FaceGui(QWidget):
         req.type = seq_dict['type']
         req.rate = self.rate_slider.value()
 
-        style = "color: #007acc; font-size: 18px; font-weight: bold;"
+        style = 'color: #007acc; font-size: 18px; font-weight: bold;'
         self.status_label.setText(f"Status: Sending {seq_dict['name']}...")
         self.status_label.setStyleSheet(style)
 
@@ -293,23 +293,23 @@ class FaceGui(QWidget):
         try:
             response = future.result()
             if not response.error:
-                style = "color: #00ff00; font-size: 18px; font-weight: bold;"
-                self.status_label.setText("Status: Sequence accepted")
+                style = 'color: #00ff00; font-size: 18px; font-weight: bold;'
+                self.status_label.setText('Status: Sequence accepted')
                 self.status_label.setStyleSheet(style)
             else:
-                style = "color: #ff4444; font-size: 18px; font-weight: bold;"
-                self.status_label.setText(f"Status Error: {response.error}")
+                style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
+                self.status_label.setText(f'Status Error: {response.error}')
                 self.status_label.setStyleSheet(style)
         except Exception as e:
-            style = "color: #ff4444; font-size: 18px; font-weight: bold;"
-            self.status_label.setText(f"Status Exception: {str(e)}")
+            style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
+            self.status_label.setText(f'Status Exception: {str(e)}')
             self.status_label.setStyleSheet(style)
 
     def marker_callback(self, msg):
         """Handle incoming MarkerArray messages (status monitoring)."""
         self.marker_count += 1
         if self.marker_count % 30 == 0:
-            self.node.get_logger().debug(f"Received MarkerArray frame {self.marker_count}")
+            self.node.get_logger().debug(f'Received MarkerArray frame {self.marker_count}')
 
     def test_sequence(self):
         """Trigger a temporary 'TEST' sequence using current editor values."""
@@ -341,10 +341,10 @@ class FaceGui(QWidget):
 
         if existing_idx >= 0:
             self.sequences[existing_idx] = new_seq
-            self.status_label.setText(f"Status: Updated {name}")
+            self.status_label.setText(f'Status: Updated {name}')
         else:
             self.sequences.append(new_seq)
-            self.status_label.setText(f"Status: Added {name}")
+            self.status_label.setText(f'Status: Added {name}')
 
         self.refresh_presets()
 
@@ -354,20 +354,20 @@ class FaceGui(QWidget):
             name = self.sequences[index]['name']
             del self.sequences[index]
             self.refresh_presets()
-            self.status_label.setText(f"Status: Deleted {name}")
+            self.status_label.setText(f'Status: Deleted {name}')
 
     def save_config(self):
         """Persist the current sequence list to the YAML configuration file."""
         try:
             with open(self.config_path, 'w') as f:
                 yaml.dump({'sequences': self.sequences}, f, default_flow_style=False)
-            style = "color: #00ff00; font-size: 18px; font-weight: bold;"
-            self.status_label.setText("Status: Config SAVED to YAML!")
+            style = 'color: #00ff00; font-size: 18px; font-weight: bold;'
+            self.status_label.setText('Status: Config SAVED to YAML!')
             self.status_label.setStyleSheet(style)
-            QMessageBox.information(self, "Success", f"Config saved to:\n{self.config_path}")
+            QMessageBox.information(self, 'Success', f'Config saved to:\n{self.config_path}')
         except Exception as e:
-            style = "color: #ff4444; font-size: 18px; font-weight: bold;"
-            self.status_label.setText(f"Save Error: {str(e)}")
+            style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
+            self.status_label.setText(f'Save Error: {str(e)}')
             self.status_label.setStyleSheet(style)
 
     def ros_spin(self):
