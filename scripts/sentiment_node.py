@@ -28,11 +28,12 @@ import huggingface_hub
 from matplotlib import colormaps
 import numpy as np
 import onnxruntime as ort
+from tokenizers import Tokenizer
+
 from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import ColorRGBA, Float32, String
-from tokenizers import Tokenizer
 
 
 class SentimentNode(Node):
