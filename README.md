@@ -10,6 +10,7 @@ ROS 2 package for facial animation playback and sentiment-driven color orchestra
 - **Sentiment Logic (Python)**: ONNX-based TinyBERT sentiment analysis for deep context awareness.
 - **Marker Colorizer (C++)**: Real-time RGBA override for visualization markers.
 - **Sequence GUI (Python)**: PyQt5 interface for triggering and managing animation sequences.
+- **Dynamic Tuning**: Adjust behavior at runtime via ROS parameters or Environment Variables.
 
 ## Components
 
@@ -25,12 +26,11 @@ Applies sentiment color to incoming markers.
 - **Publishes**: `marker_array_out` (`visualization_msgs/MarkerArray`)
 
 ### `sentiment` (Node)
-Text-to-color mapping.
+Text-to-color mapping. Performs context-aware analysis using ONNX models.
 - **Subscribes**: `analize` (`std_msgs/String`)
 - **Publishes**: `face_color_override` (`std_msgs/ColorRGBA`), `sentiment_score` (`std_msgs/Float32`)
-- **Engine**: ONNX Runtime (TinyBERT)
 
-### `motion_manager` (Node)
+### `motion_manager` (Node) / `motion_node`
 Automation of facial states (Speaking/Idle).
 - **Subscribes**: `spoken_text` (`std_msgs/String`), `speaking_flag` (`std_msgs/Bool`)
 - **Services**: `set_sequence` (Client: calls the `bag` node)
@@ -40,60 +40,50 @@ Interactive sequence editor and manual control.
 - **Services**: `set_sequence` (Client)
 - **Files**: Reads/Writes `config/sequences.yaml`
 
-## Configuration
-Standard integration flow:
-`bag` (out: `marker_array_raw`) -> `face_marker` (in: `marker_array_raw`, out: `marker_array`) -> `face_gui` & RViz.
+## Parameters & Environment Variables
 
-## Parameters
+All nodes support standard ROS parameters which can also be initialized via Environment Variables (useful for Docker deployments).
 
-| Node | Parameter | Default | Description |
-|------|-----------|---------|-------------|
-| `sentiment` | `model_repo` | `Xenova/twitter-xlm-roberta-base-sentiment-multilingual` | Powerful multilingual model (default). |
-| `sentiment` | `model_dir` | `""` | Local directory for storing/loading the model. |
-| `sentiment` | `sensitivity` | `2.5` | Linear multiplier (spread). Typical 1.0-3.0. |
-| `sentiment` | `smooth_alpha` | `0.5` | Smoothing factor [0.0 to 1.0]. |
-| `sentiment` | `temperature` | `1.0` | Logit scaling [> 0.0]. |
-| `sentiment` | `buffer_size` | `80` | Character buffer [0 = instant, > 0 = context]. |
-| `sentiment` | `cmap_name` | `RdYlGn` | Matplotlib colormap (Red-Yellow-Green). |
+### Sentiment Parameters
+| Parameter | Env Variable | Default | Description |
+|-----------|--------------|---------|-------------|
+| `model_repo` | `SENTIMENT_MODEL_REPO` | `Xenova/twitter-xlm-roberta-base-sentiment-multilingual` | HF model repository. |
+| `model_dir` | `SENTIMENT_MODEL_DIR` | `""` | Local directory for model storage. |
+| `sensitivity` | `SENTIMENT_SENSITIVITY` | `2.5` | [Dynamic] Multiplier (spread). |
+| `smooth_alpha` | `SENTIMENT_SMOOTH_ALPHA` | `0.5` | [Dynamic] Smoothing [0..1]. |
+| `temperature` | `SENTIMENT_TEMPERATURE` | `1.0` | [Dynamic] Logit scaling [>0]. |
+| `buffer_size` | `SENTIMENT_BUFFER_SIZE` | `80` | [Dynamic] Character buffer. |
+| `cmap_name` | `SENTIMENT_CMAP_NAME` | `RdYlGn` | Matplotlib colormap. |
 
-### Motion Manager Parameters
-The `motion_node` supports dynamic reconfiguration. Rebuilding pools happens automatically.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `seconds_per_char` | float | 0.07 | Seconds added to speaking duration per character (Heuristic). |
-| `min_idle_duration` | float | 5.0 | Minimum seconds between idle animations. |
-| `max_idle_duration` | float | 15.0 | Maximum seconds between idle animations. |
-| `speaking_sequences`| string| "" | Comma-separated list of sequence names for speaking pool. |
-| `idle_sequences`    | string| "" | Comma-separated list of sequence names for idle pool. |
+### Motion Parameters
+| Parameter | Env Variable | Default | Description |
+|-----------|--------------|---------|-------------|
+| `sequences_config` | `MOTION_SEQUENCES_CONFIG` | `.../sequences.yaml` | Path to sequences file. |
+| `seconds_per_char` | `MOTION_SECONDS_PER_CHAR` | `0.07` | [Dynamic] s/char heuristic. |
+| `min_idle_duration` | `MOTION_MIN_IDLE_DURATION` | `5.0` | [Dynamic] Min idle pause. |
+| `max_idle_duration` | `MOTION_MAX_IDLE_DURATION` | `15.0` | [Dynamic] Max idle pause. |
+| `speaking_sequences`| `MOTION_SPEAKING_SEQUENCES`| `""` | [Dynamic] Comma-separated names. |
+| `idle_sequences`    | `MOTION_IDLE_SEQUENCES`    | `""` | [Dynamic] Comma-separated names. |
 
 ## Sentiment Tuning (Lessons Learned)
 
-Through extensive testing with the **Bob Face** interface, we found the following "sweet spot" settings for a natural conversational experience:
+Through extensive testing, we found the following "sweet spot" settings:
 
 ### 1. The "Mood" Persistence (Buffer & Smoothing)
-*   **The Buffer Problem**: A large buffer (`> 150` chars) acts as emotional memory. If Bob hears something deeply negative, he stays "sad" for several sentences until the negative text is pushed out.
-*   **Recommendation**: Use **`buffer_size := 80`** (approx. one sentence). This allows Bob to maintain a "current mood" while still being responsive to the next input.
-*   **Inertia**: Use **`smooth_alpha := 0.5`**. This mimics human emotion—we don't change from happy to sad in a millisecond, but it shouldn't take minutes either.
+*   **Recommendation**: Use **`buffer_size := 80`** (approx. one sentence).
+*   **Inertia**: Use **`smooth_alpha := 0.5`**. This mimics human emotion inertia.
 
 ### 2. Clarity vs. Neutrality (Temperature)
-*   **Keyword Bias**: Models can be "scared" by words like *Asthma* or *Symptom*, even in a positive context. 
-*   **Recommendation**: Use **`temperature := 1.0`**. Going lower (e.g., `0.4`) makes Bob more "extreme" and sensitive to keywords, while higher values (e.g., `1.5`) make him more unshakeable/neutral.
+*   **Recommendation**: Use **`temperature := 1.0`**. Lower values makes Bob more "extreme", higher values more neutral.
 
 ### 3. Stretching the Spectrum (Sensitivity)
-*   If Bob stays too "pale" (yellow) despite positive/negative input, increase **`sensitivity`** to **`2.5` - `3.0`**. This stretches the internal score away from the center towards the vibrant Red/Green edges of the colormap.
+*   If Bob stays too "pale" (yellow), increase **`sensitivity`** to **`2.5` - `3.0`**.
 
 ## Model Choice & Alternatives
 
-Different models have different "personalities" and label orders. We verified the following:
-
 1.  **[XLM-RoBERTa (Default)](https://huggingface.co/Xenova/twitter-xlm-roberta-base-sentiment-multilingual)**: 
-    *   **Label Order**: `0: Positive`, `1: Neutral`, `2: Negative`.
-    *   **Pros**: Excellent nuanced understanding of German and English. Less prone to trivial keyword triggers. Recommended for complex dialogue.
-2.  **[DistilBERT Multilingual](https://huggingface.co/Xenova/distilbert-base-multilingual-cased-sentiments-student)**:
-    *   **Label Order**: `0: Positive`, `1: Neutral`, `2: Negative`.
-    *   **Pros**: Very fast, light-weight.
-    *   **Cons**: Higher "Keyword Bias" (e.g., gets scared easily by medical/technical terms regardless of context).
+    *   **Label Order**: `0: Negative`, `1: Neutral`, `2: Positive`.
+    *   **Pros**: Excellent nuanced understanding of German and English. Recommended.
 
 ## Requirements
 - Python: `onnxruntime`, `tokenizers`, `matplotlib`, `PyQt5`, `PyYAML`, `numpy<2`
@@ -102,33 +92,23 @@ Different models have different "personalities" and label orders. We verified th
 ## Installation & Build
 
 ### Docker (Recommended)
-Official Docker images are available for both **amd64** and **arm64** via GitHub Container Registry. 
-View available versions here: [ghcr.io/bob-ros2/bob-face](https://github.com/bob-ros2/bob_face/pkgs/container/bob-face)
-
-To pull the latest image:
+Official images for **amd64** and **arm64**:
 ```bash
 docker pull ghcr.io/bob-ros2/bob-face:latest
+
+# Example run with env overrides
+docker run -it --rm --network host \
+  -e MOTION_SECONDS_PER_CHAR=0.05 \
+  -e SENTIMENT_SENSITIVITY=3.0 \
+  ghcr.io/bob-ros2/bob-face:latest
 ```
 
-### Manual Workspace Build
-If you want to build from source in your ROS 2 workspace:
-
-1. **Clone the repository**:
-   ```bash
-   cd ~/ros2_ws/src
-   git clone https://github.com/bob-ros2/bob_face.git
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   cd ~/ros2_ws
-   rosdep install --from-paths src --ignore-src -r -y
-   # Install additional python dependencies
-   pip install -r src/bob_face/requirements.txt
-   ```
-
-3. **Build**:
-   ```bash
-   colcon build --packages-select bob_face
-   source install/setup.bash
-   ```
+### Manual Build
+```bash
+cd ~/ros2_ws/src
+git clone https://github.com/bob-ros2/bob_face.git
+cd ..
+rosdep install --from-paths src --ignore-src -r -y
+pip install -r src/bob_face/requirements.txt
+colcon build --packages-select bob_face
+```
