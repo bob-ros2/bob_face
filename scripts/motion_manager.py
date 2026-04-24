@@ -187,10 +187,17 @@ class MotionNode(Node):
         except Exception:
             return []
 
-    def parse_sequence_groups(self):
-        """Build speaking and idle pools based on parameters."""
-        speak_str = self.get_parameter('speaking_sequences').value
-        idle_str = self.get_parameter('idle_sequences').value
+    def parse_sequence_groups(self, speak_str=None, idle_str=None):
+        """
+        Build speaking and idle pools based on parameters.
+
+        :param speak_str: Optional new speaking string.
+        :param idle_str: Optional new idle string.
+        """
+        if speak_str is None:
+            speak_str = self.get_parameter('speaking_sequences').value
+        if idle_str is None:
+            idle_str = self.get_parameter('idle_sequences').value
 
         self.speaking_pool = []
         self.idle_pool = []
@@ -209,14 +216,22 @@ class MotionNode(Node):
         if not self.idle_pool:
             self.idle_pool = self.all_sequences
 
+        self.get_logger().info(
+            f'Updated pools: {len(self.speaking_pool)} speak, '
+            f'{len(self.idle_pool)} idle.')
+
     def parameter_callback(self, params):
         """Handle dynamic parameter updates."""
-        rebuild = False
-        for param in params:
-            if param.name.endswith('_sequences'):
-                rebuild = True
-        if rebuild:
-            self.parse_sequence_groups()
+        new_speak = None
+        new_idle = None
+        for p in params:
+            if p.name == 'speaking_sequences':
+                new_speak = p.value
+            elif p.name == 'idle_sequences':
+                new_idle = p.value
+
+        if new_speak is not None or new_idle is not None:
+            self.parse_sequence_groups(new_speak, new_idle)
         return SetParametersResult(successful=True)
 
     def stop_speaking_callback(self):
