@@ -56,6 +56,17 @@ Standard integration flow:
 | `sentiment` | `buffer_size` | `80` | Character buffer [0 = instant, > 0 = context]. |
 | `sentiment` | `cmap_name` | `RdYlGn` | Matplotlib colormap (Red-Yellow-Green). |
 
+### Motion Manager Parameters
+The `motion_node` supports dynamic reconfiguration. Rebuilding pools happens automatically.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seconds_per_char` | float | 0.07 | Seconds added to speaking duration per character (Heuristic). |
+| `min_idle_duration` | float | 5.0 | Minimum seconds between idle animations. |
+| `max_idle_duration` | float | 15.0 | Maximum seconds between idle animations. |
+| `speaking_sequences`| string| "" | Comma-separated list of sequence names for speaking pool. |
+| `idle_sequences`    | string| "" | Comma-separated list of sequence names for idle pool. |
+
 ## Sentiment Tuning (Lessons Learned)
 
 Through extensive testing with the **Bob Face** interface, we found the following "sweet spot" settings for a natural conversational experience:

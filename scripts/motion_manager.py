@@ -29,7 +29,7 @@ import rclpy
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
-from rcl_interfaces.msg import ParameterDescriptor, ParameterType
+from rcl_interfaces.msg import ParameterDescriptor, ParameterType, SetParametersResult
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
 
@@ -126,6 +126,9 @@ class MotionNode(Node):
             String, 'spoken_text', self.spoken_callback, 10)
         self.sub_flag = self.create_subscription(
             Bool, 'speaking_flag', self.flag_callback, 10)
+
+        # Parameter callback for dynamic reconfiguration
+        self.add_on_set_parameters_callback(self.parameter_callback)
 
         # Start initial idle behavior
         self.start_idle_timer()
@@ -240,6 +243,24 @@ class MotionNode(Node):
         self.get_logger().info(
             f"Loaded {len(self.speaking_pool)} speaking and "
             f"{len(self.idle_pool)} idle sequences.")
+
+    def parameter_callback(self, params):
+        """
+        Handle dynamic parameter updates.
+
+        :param params: List of updated parameters.
+        :return: SetParametersResult indicating success.
+        """
+        rebuild_pools = False
+        for param in params:
+            if param.name in ['speaking_sequences', 'idle_sequences']:
+                rebuild_pools = True
+            self.get_logger().info(f"Parameter '{param.name}' updated to: {param.value}")
+
+        if rebuild_pools:
+            self.parse_sequence_groups()
+
+        return SetParametersResult(successful=True)
 
     def stop_speaking_callback(self):
         """Return to idle state after speaking duration elapses."""
