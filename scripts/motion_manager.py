@@ -49,14 +49,14 @@ class MotionNode(Node):
         """Initialize parameters, load sequences, and setup communication."""
         super().__init__('motion_manager')
 
-        # Declare parameters
+        # Declare parameters with Environment Variable support
         default_config = os.path.join(
             get_package_share_directory('bob_face'),
             'config', 'sequences.yaml'
         )
         self.declare_parameter(
             'sequences_config',
-            default_config,
+            os.environ.get('MOTION_SEQUENCES_CONFIG', default_config),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='Path to the sequences YAML configuration.'
@@ -72,12 +72,9 @@ class MotionNode(Node):
             )
         )
 
-        speed = self.get_parameter('seconds_per_char').value
-        self.get_logger().info(f'Using speed: {speed} s/char')
-
         self.declare_parameter(
             'min_idle_duration',
-            5.0,
+            float(os.environ.get('MOTION_MIN_IDLE_DURATION', '5.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
                 description='Min time between idle animations.'
@@ -86,7 +83,7 @@ class MotionNode(Node):
 
         self.declare_parameter(
             'max_idle_duration',
-            15.0,
+            float(os.environ.get('MOTION_MAX_IDLE_DURATION', '15.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
                 description='Max time between idle animations.'
@@ -95,7 +92,7 @@ class MotionNode(Node):
 
         self.declare_parameter(
             'speaking_sequences',
-            '',
+            os.environ.get('MOTION_SPEAKING_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='Sequence names.'
@@ -104,12 +101,16 @@ class MotionNode(Node):
 
         self.declare_parameter(
             'idle_sequences',
-            '',
+            os.environ.get('MOTION_IDLE_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='Sequence names.'
             )
         )
+
+        # Log active config
+        speed = self.get_parameter('seconds_per_char').value
+        self.get_logger().info(f'Using speed: {speed} s/char')
 
         # Load and parse sequences
         self.all_sequences = self.load_sequences()

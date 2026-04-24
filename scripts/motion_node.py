@@ -15,14 +15,13 @@
 # limitations under the License.
 
 """
-Motion Orchestration Node for Bob.
+Facial Motion Node for Bob.
 
-Automates facial animations by switching between 'Speaking' and 'Idle' states.
+Orchestrates animations by reacting to spoken text or manual flags.
 """
 
 import os
 import random
-import sys
 
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
@@ -39,27 +38,26 @@ import yaml
 
 class MotionNode(Node):
     """
-    ROS 2 Node for managing facial motion states.
+    ROS 2 Node for controlling facial animations.
 
-    Orchestrates animations by monitoring TTS output (spoken_text) or
-    explicit speaking flags (speaking_flag).
+    Supports heuristic-based speaking animations and random idle behaviors.
     """
 
     def __init__(self):
-        """Initialize parameters, load sequences, and setup communication."""
+        """Initialize parameters and setup orchestration logic."""
         super().__init__('motion_node')
 
-        # Declare parameters
+        # Declare parameters with Environment Variable support
         default_config = os.path.join(
             get_package_share_directory('bob_face'),
             'config', 'sequences.yaml'
         )
         self.declare_parameter(
             'sequences_config',
-            default_config,
+            os.environ.get('MOTION_SEQUENCES_CONFIG', default_config),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
-                description='Path to the sequences YAML configuration.'
+                description='Path to sequences YAML.'
             )
         )
 
@@ -68,34 +66,31 @@ class MotionNode(Node):
             float(os.environ.get('MOTION_SECONDS_PER_CHAR', '0.07')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Heuristic for speaking duration calculation.'
+                description='Duration multiplier for text heuristic.'
             )
         )
 
-        speed = self.get_parameter('seconds_per_char').value
-        self.get_logger().info(f'Using speed: {speed} s/char')
-
         self.declare_parameter(
             'min_idle_duration',
-            5.0,
+            float(os.environ.get('MOTION_MIN_IDLE_DURATION', '5.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Min time between idle animations.'
+                description='Min idle pause.'
             )
         )
 
         self.declare_parameter(
             'max_idle_duration',
-            15.0,
+            float(os.environ.get('MOTION_MAX_IDLE_DURATION', '15.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Max time between idle animations.'
+                description='Max idle pause.'
             )
         )
 
         self.declare_parameter(
             'speaking_sequences',
-            '',
+            os.environ.get('MOTION_SPEAKING_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='Sequence names.'
@@ -104,7 +99,7 @@ class MotionNode(Node):
 
         self.declare_parameter(
             'idle_sequences',
-            '',
+            os.environ.get('MOTION_IDLE_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description='Sequence names.'
@@ -117,13 +112,13 @@ class MotionNode(Node):
         self.idle_pool = []
         self.parse_sequence_groups()
 
-        # State tracking
+        # State
         self.is_speaking = False
+        self.last_speaking_flag = False
         self.current_timer = None
         self.idle_timer = None
-        self.last_speaking_flag = False
 
-        # Register callback for dynamic parameters
+        # Callbacks for dynamic tuning
         self.add_on_set_parameters_callback(self.parameter_callback)
 
         # Communication
@@ -133,22 +128,20 @@ class MotionNode(Node):
         self.sub_flag = self.create_subscription(
             Bool, 'speaking_flag', self.flag_callback, 10)
 
-        # Start initial idle behavior
+        # Boot up behavior
         self.start_idle_timer()
         self.get_logger().info('Motion Node initialized.')
 
     def flag_callback(self, msg: Bool):
         """
-        Handle explicit speaking flag updates.
+        React to explicit speaking status updates.
 
-        :param msg: Boolean message indicating speaking state.
+        :param msg: Boolean flag.
         """
         if msg.data == self.last_speaking_flag:
             return
 
         self.last_speaking_flag = msg.data
-        self.get_logger().info(f'Speaking flag changed to: {msg.data}')
-
         if msg.data:
             self.is_speaking = True
             self.stop_timers()
@@ -159,135 +152,78 @@ class MotionNode(Node):
 
     def spoken_callback(self, msg: String):
         """
-        Trigger speaking state based on incoming text (Heuristic mode).
+        Trigger animation based on text length (Heuristic).
 
-        :param msg: String message containing spoken text.
+        :param msg: Input text string.
         """
         if not msg.data:
             return
 
-        # Check for flag publishers
+        # Heuristic only runs if no flag publishers are present
         if self.count_publishers('speaking_flag') > 0:
-            self.get_logger().debug(
-                'Speaking flag publishers detected.'
-                ' Ignoring spoken_text heuristic.')
             return
 
-        # Calculate duration
         duration = len(msg.data) * self.get_parameter('seconds_per_char').value
-        text_preview = msg.data[:20]
-        self.get_logger().info(
-            f"Speaking detected: '{text_preview}...' "
-            f'(Estimated duration: {duration:.2f}s)')
-
         self.is_speaking = True
         self.stop_timers()
 
-        # Call service with random speaking sequence
         if self.speaking_pool:
             self.trigger_sequence(random.choice(self.speaking_pool))
 
-        # Set timer to return to idle
         self.current_timer = self.create_timer(
             duration, self.stop_speaking_callback)
 
     def load_sequences(self):
-        """
-        Load sequences from YAML file.
-
-        :return: List of sequence dictionaries.
-        """
-        config_path = self.get_parameter('sequences_config').value
-        if not os.path.exists(config_path):
-            self.get_logger().error(f'No config: {config_path}')
-            sys.exit(1)
-
+        """Load YAML configuration."""
+        path = self.get_parameter('sequences_config').value
         try:
-            with open(config_path, 'r') as f:
-                data = yaml.safe_load(f)
-                seqs = data.get('sequences', [])
-                if not seqs:
-                    self.get_logger().error('No seqs in YAML.')
-                    sys.exit(1)
-                return seqs
-        except Exception as e:
-            self.get_logger().error(f'Error loading YAML: {e}')
-            sys.exit(1)
+            with open(path, 'r') as f:
+                return yaml.safe_load(f).get('sequences', [])
+        except Exception:
+            self.get_logger().error(f'Failed to load: {path}')
+            return []
 
     def parse_sequence_groups(self):
-        """Build speaking and idle pools based on parameters or fallbacks."""
+        """Build animation pools from parameters."""
         speak_str = self.get_parameter('speaking_sequences').value
         idle_str = self.get_parameter('idle_sequences').value
 
         self.speaking_pool = []
         self.idle_pool = []
 
-        if not speak_str and not idle_str:
-            # Fallback logic
-            self.get_logger().info(
-                'No sequence groupings defined. Using fallback logic.')
-            self.speaking_pool = [self.all_sequences[0]]
-            if len(self.all_sequences) > 1:
-                self.idle_pool = self.all_sequences[1:]
-            else:
-                self.idle_pool = [self.all_sequences[0]]
-        else:
-            # Parse comma-separated strings
-            speak_names = [s.strip() for s in speak_str.split(',') if s.strip()]
-            idle_names = [s.strip() for s in idle_str.split(',') if s.strip()]
+        speak_names = [s.strip() for s in speak_str.split(',') if s.strip()]
+        idle_names = [s.strip() for s in idle_str.split(',') if s.strip()]
 
-            for seq in self.all_sequences:
-                if seq['name'] in speak_names:
-                    self.speaking_pool.append(seq)
-                if seq['name'] in idle_names:
-                    self.idle_pool.append(seq)
+        for seq in self.all_sequences:
+            if not speak_names or seq['name'] in speak_names:
+                self.speaking_pool.append(seq)
+            if not idle_names or seq['name'] in idle_names:
+                self.idle_pool.append(seq)
 
-        if not self.speaking_pool:
-            self.get_logger().warn('Speaking pool empty! Using fallback.')
+        if not self.speaking_pool and self.all_sequences:
             self.speaking_pool = [self.all_sequences[0]]
         if not self.idle_pool:
-            self.get_logger().warn('Idle pool empty! Using all.')
             self.idle_pool = self.all_sequences
 
-        self.get_logger().info(
-            f'Loaded {len(self.speaking_pool)} speaking and '
-            f'{len(self.idle_pool)} idle sequences.')
-
     def parameter_callback(self, params):
-        """
-        Handle dynamic parameter updates.
-
-        :param params: List of updated parameters.
-        :return: SetParametersResult indicating success.
-        """
-        rebuild_pools = False
-        for param in params:
-            if param.name in ['speaking_sequences', 'idle_sequences']:
-                rebuild_pools = True
-            self.get_logger().info(
-                f"Parameter '{param.name}' updated to: {param.value}")
-
-        if rebuild_pools:
+        """Dynamic parameter handler."""
+        # Rebuild pools if string lists change
+        rebuild = any(p.name.endswith('_sequences') for p in params)
+        if rebuild:
             self.parse_sequence_groups()
         return SetParametersResult(successful=True)
 
     def stop_speaking_callback(self):
-        """Return to idle state after speaking duration elapses."""
-        self.get_logger().info('Speaking finished. Returning to idle.')
+        """Transition back to idle state."""
         self.is_speaking = False
         self.stop_timers()
         self.start_idle_timer()
 
     def start_idle_timer(self):
-        """Schedule next random idle animation."""
+        """Schedule the next idle movement."""
         if self.is_speaking:
             return
 
-        # Trigger one now
-        if self.idle_pool:
-            self.trigger_sequence(random.choice(self.idle_pool))
-
-        # Schedule next
         wait = random.uniform(
             self.get_parameter('min_idle_duration').value,
             self.get_parameter('max_idle_duration').value
@@ -295,25 +231,17 @@ class MotionNode(Node):
         self.idle_timer = self.create_timer(wait, self.idle_anim_callback)
 
     def idle_anim_callback(self):
-        """Trigger a random idle animation and reschedule."""
+        """Trigger idle and reschedule."""
         if self.is_speaking:
             return
-
         if self.idle_pool:
             self.trigger_sequence(random.choice(self.idle_pool))
-
-        # Reschedule with new random duration
         self.stop_timers()
         self.start_idle_timer()
 
     def trigger_sequence(self, seq):
-        """
-        Send service call to trigger a sequence.
-
-        :param seq: Sequence dictionary.
-        """
-        if not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn('Service set_sequence not available.')
+        """Call animation service."""
+        if not self.client.wait_for_service(timeout_sec=0.1):
             return
 
         req = SetSequence.Request()
@@ -321,11 +249,10 @@ class MotionNode(Node):
         req.end = int(seq['end'])
         req.rate = int(seq.get('rate', 30))
         req.type = int(seq.get('type', 1))
-
         self.client.call_async(req)
 
     def stop_timers(self):
-        """Cancel both speaking and idle timers."""
+        """Cleanup timers."""
         if self.current_timer:
             self.current_timer.cancel()
             self.destroy_timer(self.current_timer)
@@ -337,7 +264,7 @@ class MotionNode(Node):
 
 
 def main(args=None):
-    """Run the Motion Node."""
+    """Run the main loop."""
     rclpy.init(args=args)
     node = MotionNode()
     try:
@@ -346,8 +273,7 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
