@@ -23,23 +23,17 @@ Automates facial animations by switching between 'Speaking' and 'Idle' states.
 import os
 import random
 import sys
-import time
 
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
-import huggingface_hub
-from matplotlib import colormaps
-import numpy as np
-import onnxruntime as ort
-import rclpy
 from rcl_interfaces.msg import (
     ParameterDescriptor,
     ParameterType,
     SetParametersResult
 )
+import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool, ColorRGBA, Float32, String
-from tokenizers import Tokenizer
+from std_msgs.msg import Bool, String
 import yaml
 
 
@@ -67,12 +61,6 @@ class MotionNode(Node):
                 type=ParameterType.PARAMETER_STRING,
                 description='Path to the sequences YAML configuration.'
             )
-        )
-
-        self.declare_parameter(
-            'model_repo',
-            os.environ.get('SENTIMENT_MODEL_REPO', 'default_repo'),
-            ParameterDescriptor(description='HF model repo.')
         )
 
         self.declare_parameter(
@@ -134,7 +122,6 @@ class MotionNode(Node):
         self.current_timer = None
         self.idle_timer = None
         self.last_speaking_flag = False
-        self.last_score = 0.0
 
         # Register callback for dynamic parameters
         self.add_on_set_parameters_callback(self.parameter_callback)

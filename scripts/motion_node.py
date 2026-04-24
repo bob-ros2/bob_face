@@ -26,12 +26,12 @@ import sys
 
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
-import rclpy
 from rcl_interfaces.msg import (
     ParameterDescriptor,
     ParameterType,
     SetParametersResult
 )
+import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
 import yaml
