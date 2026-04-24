@@ -22,7 +22,6 @@ Automates facial animations by switching between 'Speaking' and 'Idle' states.
 
 import os
 import random
-import sys
 
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
@@ -68,7 +67,7 @@ class MotionNode(Node):
             float(os.environ.get('MOTION_SECONDS_PER_CHAR', '0.07')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Heuristic for speaking duration calculation.'
+                description='[Dynamic] Heuristic for speaking duration.'
             )
         )
 
@@ -77,7 +76,7 @@ class MotionNode(Node):
             float(os.environ.get('MOTION_MIN_IDLE_DURATION', '5.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Min time between idle animations.'
+                description='[Dynamic] Min time between idle animations.'
             )
         )
 
@@ -86,7 +85,7 @@ class MotionNode(Node):
             float(os.environ.get('MOTION_MAX_IDLE_DURATION', '15.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Max time between idle animations.'
+                description='[Dynamic] Max time between idle animations.'
             )
         )
 
@@ -95,7 +94,7 @@ class MotionNode(Node):
             os.environ.get('MOTION_SPEAKING_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
-                description='Sequence names.'
+                description='[Dynamic] Comma-separated speaking sequences.'
             )
         )
 
@@ -104,13 +103,9 @@ class MotionNode(Node):
             os.environ.get('MOTION_IDLE_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
-                description='Sequence names.'
+                description='[Dynamic] Comma-separated idle sequences.'
             )
         )
-
-        # Log active config
-        speed = self.get_parameter('seconds_per_char').value
-        self.get_logger().info(f'Using speed: {speed} s/char')
 
         # Load and parse sequences
         self.all_sequences = self.load_sequences()
@@ -148,8 +143,6 @@ class MotionNode(Node):
             return
 
         self.last_speaking_flag = msg.data
-        self.get_logger().info(f'Speaking flag changed to: {msg.data}')
-
         if msg.data:
             self.is_speaking = True
             self.stop_timers()
@@ -167,28 +160,17 @@ class MotionNode(Node):
         if not msg.data:
             return
 
-        # Check for flag publishers
         if self.count_publishers('speaking_flag') > 0:
-            self.get_logger().debug(
-                'Speaking flag publishers detected.'
-                ' Ignoring spoken_text heuristic.')
             return
 
         # Calculate duration
         duration = len(msg.data) * self.get_parameter('seconds_per_char').value
-        text_preview = msg.data[:20]
-        self.get_logger().info(
-            f"Speaking detected: '{text_preview}...' "
-            f'(Estimated duration: {duration:.2f}s)')
-
         self.is_speaking = True
         self.stop_timers()
 
-        # Call service with random speaking sequence
         if self.speaking_pool:
             self.trigger_sequence(random.choice(self.speaking_pool))
 
-        # Set timer to return to idle
         self.current_timer = self.create_timer(
             duration, self.stop_speaking_callback)
 
@@ -199,82 +181,46 @@ class MotionNode(Node):
         :return: List of sequence dictionaries.
         """
         config_path = self.get_parameter('sequences_config').value
-        if not os.path.exists(config_path):
-            self.get_logger().error(f'No config: {config_path}')
-            sys.exit(1)
-
         try:
             with open(config_path, 'r') as f:
-                data = yaml.safe_load(f)
-                seqs = data.get('sequences', [])
-                if not seqs:
-                    self.get_logger().error('No seqs in YAML.')
-                    sys.exit(1)
-                return seqs
-        except Exception as e:
-            self.get_logger().error(f'Error loading YAML: {e}')
-            sys.exit(1)
+                return yaml.safe_load(f).get('sequences', [])
+        except Exception:
+            return []
 
     def parse_sequence_groups(self):
-        """Build speaking and idle pools based on parameters or fallbacks."""
+        """Build speaking and idle pools based on parameters."""
         speak_str = self.get_parameter('speaking_sequences').value
         idle_str = self.get_parameter('idle_sequences').value
 
         self.speaking_pool = []
         self.idle_pool = []
 
-        if not speak_str and not idle_str:
-            # Fallback logic
-            self.get_logger().info(
-                'No sequence groupings defined. Using fallback logic.')
-            self.speaking_pool = [self.all_sequences[0]]
-            if len(self.all_sequences) > 1:
-                self.idle_pool = self.all_sequences[1:]
-            else:
-                self.idle_pool = [self.all_sequences[0]]
-        else:
-            # Parse comma-separated strings
-            speak_names = [s.strip() for s in speak_str.split(',') if s.strip()]
-            idle_names = [s.strip() for s in idle_str.split(',') if s.strip()]
+        speak_names = [s.strip() for s in speak_str.split(',') if s.strip()]
+        idle_names = [s.strip() for s in idle_str.split(',') if s.strip()]
 
-            for seq in self.all_sequences:
-                if seq['name'] in speak_names:
-                    self.speaking_pool.append(seq)
-                if seq['name'] in idle_names:
-                    self.idle_pool.append(seq)
+        for seq in self.all_sequences:
+            if not speak_names or seq['name'] in speak_names:
+                self.speaking_pool.append(seq)
+            if not idle_names or seq['name'] in idle_names:
+                self.idle_pool.append(seq)
 
-        if not self.speaking_pool:
-            self.get_logger().warn('Speaking pool empty! Using fallback.')
+        if not self.speaking_pool and self.all_sequences:
             self.speaking_pool = [self.all_sequences[0]]
         if not self.idle_pool:
-            self.get_logger().warn('Idle pool empty! Using all.')
             self.idle_pool = self.all_sequences
 
-        self.get_logger().info(
-            f'Loaded {len(self.speaking_pool)} speaking and '
-            f'{len(self.idle_pool)} idle sequences.')
-
     def parameter_callback(self, params):
-        """
-        Handle dynamic parameter updates.
-
-        :param params: List of updated parameters.
-        :return: SetParametersResult indicating success.
-        """
-        rebuild_pools = False
+        """Handle dynamic parameter updates."""
+        rebuild = False
         for param in params:
-            if param.name in ['speaking_sequences', 'idle_sequences']:
-                rebuild_pools = True
-            self.get_logger().info(
-                f"Parameter '{param.name}' updated to: {param.value}")
-
-        if rebuild_pools:
+            if param.name.endswith('_sequences'):
+                rebuild = True
+        if rebuild:
             self.parse_sequence_groups()
         return SetParametersResult(successful=True)
 
     def stop_speaking_callback(self):
         """Return to idle state after speaking duration elapses."""
-        self.get_logger().info('Speaking finished. Returning to idle.')
         self.is_speaking = False
         self.stop_timers()
         self.start_idle_timer()
@@ -284,11 +230,6 @@ class MotionNode(Node):
         if self.is_speaking:
             return
 
-        # Trigger one now
-        if self.idle_pool:
-            self.trigger_sequence(random.choice(self.idle_pool))
-
-        # Schedule next
         wait = random.uniform(
             self.get_parameter('min_idle_duration').value,
             self.get_parameter('max_idle_duration').value
@@ -299,22 +240,14 @@ class MotionNode(Node):
         """Trigger a random idle animation and reschedule."""
         if self.is_speaking:
             return
-
         if self.idle_pool:
             self.trigger_sequence(random.choice(self.idle_pool))
-
-        # Reschedule with new random duration
         self.stop_timers()
         self.start_idle_timer()
 
     def trigger_sequence(self, seq):
-        """
-        Send service call to trigger a sequence.
-
-        :param seq: Sequence dictionary.
-        """
-        if not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn('Service set_sequence not available.')
+        """Send service call to trigger a sequence."""
+        if not self.client.wait_for_service(timeout_sec=0.1):
             return
 
         req = SetSequence.Request()

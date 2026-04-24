@@ -66,7 +66,7 @@ class MotionNode(Node):
             float(os.environ.get('MOTION_SECONDS_PER_CHAR', '0.07')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Duration multiplier for text heuristic.'
+                description='[Dynamic] Duration multiplier for text heuristic.'
             )
         )
 
@@ -75,7 +75,7 @@ class MotionNode(Node):
             float(os.environ.get('MOTION_MIN_IDLE_DURATION', '5.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Min idle pause.'
+                description='[Dynamic] Min idle pause.'
             )
         )
 
@@ -84,7 +84,7 @@ class MotionNode(Node):
             float(os.environ.get('MOTION_MAX_IDLE_DURATION', '15.0')),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE,
-                description='Max idle pause.'
+                description='[Dynamic] Max idle pause.'
             )
         )
 
@@ -93,7 +93,7 @@ class MotionNode(Node):
             os.environ.get('MOTION_SPEAKING_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
-                description='Sequence names.'
+                description='[Dynamic] Comma-separated speaking sequences.'
             )
         )
 
@@ -102,7 +102,7 @@ class MotionNode(Node):
             os.environ.get('MOTION_IDLE_SEQUENCES', ''),
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
-                description='Sequence names.'
+                description='[Dynamic] Comma-separated idle sequences.'
             )
         )
 
@@ -180,7 +180,6 @@ class MotionNode(Node):
             with open(path, 'r') as f:
                 return yaml.safe_load(f).get('sequences', [])
         except Exception:
-            self.get_logger().error(f'Failed to load: {path}')
             return []
 
     def parse_sequence_groups(self):
@@ -208,7 +207,10 @@ class MotionNode(Node):
     def parameter_callback(self, params):
         """Dynamic parameter handler."""
         # Rebuild pools if string lists change
-        rebuild = any(p.name.endswith('_sequences') for p in params)
+        rebuild = False
+        for p in params:
+            if p.name.endswith('_sequences'):
+                rebuild = True
         if rebuild:
             self.parse_sequence_groups()
         return SetParametersResult(successful=True)
@@ -273,7 +275,8 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
