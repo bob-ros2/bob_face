@@ -2,32 +2,28 @@
 
 # Copyright 2026 BobRos
 #
-# Licensed under the Apache License, Version 2.0 (the 'License');
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an 'AS IS' BASIS,
+# distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
 """
-GUI for controlling facial animation sequences.
+GUI for editing facial animation sequences.
 
-This module provides a PyQt5-based interface to trigger, add, edit, and delete
-facial animation sequences stored in a YAML configuration file.
+Provides a ROS 2 interface to save and test animation ranges.
 """
 
 import os
 import signal
 import sys
 
-import rclpy
-from rclpy.node import Node
-import yaml
 from ament_index_python.packages import get_package_share_directory
 from bob_msgs.srv import SetSequence
 from PyQt5.QtCore import Qt, QTimer
@@ -35,369 +31,249 @@ from PyQt5.QtWidgets import (QApplication, QGridLayout, QGroupBox, QHBoxLayout,
                              QLabel, QLineEdit, QMessageBox, QPushButton,
                              QScrollArea, QSlider, QSpinBox, QVBoxLayout,
                              QWidget)
-from visualization_msgs.msg import MarkerArray
+import rclpy
+from rclpy.node import Node
+import yaml
 
 
-# Handle Ctrl+C properly
-def sigint_handler(*args):
-    """Handle SIGINT (Ctrl+C) to exit the application gracefully."""
-    QApplication.quit()
-
-
-class FaceGui(QWidget):
+class SequenceGUI(QWidget):
     """
-    Main GUI window for facial animation control.
+    Main GUI window for facial sequence editing.
 
-    Supports live testing, adding/overwriting sequences, and persistent
-    saving to a YAML configuration file.
+    Manages a list of sequence widgets and allows saving to YAML.
     """
 
-    def __init__(self):
-        """Initialize the ROS 2 node, load configuration, and setup the UI."""
+    def __init__(self, node):
+        """
+        Initialize the GUI.
+
+        :param node: The ROS2 node used for service calls.
+        """
         super().__init__()
-
-        # ROS 2 Node initialization
-        if not rclpy.ok():
-            rclpy.init()
-        self.node = Node('face_gui')
-
-        # Declare parameter for config file
-        default_config = os.path.join(
-            get_package_share_directory('bob_face'),
-            'config', 'sequences.yaml'
-        )
-        self.node.declare_parameter('sequences_config', default_config)
-        param = self.node.get_parameter('sequences_config')
-        self.config_path = param.get_parameter_value().string_value
-
-        self.client = self.node.create_client(SetSequence, 'set_sequence')
-
-        # MarkerArray Subscriber for graph connectivity and status
-        self.marker_sub = self.node.create_subscription(
-            MarkerArray,
-            'marker_array',
-            self.marker_callback,
-            10
-        )
-        self.marker_count = 0
-
-        # Load config
+        self.node = node
         self.sequences = []
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, 'r') as f:
-                    data = yaml.safe_load(f)
-                    self.sequences = data.get('sequences', [])
-            except Exception as e:
-                self.node.get_logger().error(f'Error loading config: {e}')
-
         self.init_ui()
-
-        # Timer for ROS 2 spinning (non-blocking)
-        self.ros_timer = QTimer()
-        self.ros_timer.timeout.connect(self.ros_spin)
-        self.ros_timer.start(10)  # 100Hz spin
+        self.load_sequences()
 
     def init_ui(self):
-        """Set up the window layout, widgets, and styles."""
-        self.setWindowTitle(f'Bob Face Control - [{os.path.basename(self.config_path)}]')
-        self.setStyleSheet("""
-            QWidget { background-color: #1e1e1e; color: #efefef;
-                      font-family: 'Segoe UI', sans-serif; }
-            QPushButton { background-color: #333; border: 1px solid #555;
-                          padding: 8px; border-radius: 4px; font-weight: bold; }
-            QPushButton:hover { background-color: #444; border-color: #007acc; }
-            QPushButton:pressed { background-color: #007acc; }
-            QLabel { font-size: 14px; }
-            QLineEdit, QSpinBox { background-color: #2b2b2b; border: 1px solid #555;
-                                  padding: 5px; color: #fff; }
-            QGroupBox { border: 1px solid #555; margin-top: 10px; font-weight: bold;
-                        padding-top: 15px; }
-            QSlider::groove:horizontal { border: 1px solid #999; height: 10px;
-                                         background: #333; border-radius: 4px; }
-            QSlider::handle:horizontal { background: #007acc; border: 1px solid #555;
-                                         width: 22px; margin: -6px 0; border-radius: 11px; }
-        """)
+        """Set up the layout and widgets."""
+        self.setWindowTitle('Bob Face Sequence Editor')
+        self.resize(800, 600)
 
         main_layout = QVBoxLayout()
 
-        # --- Presets Section ---
-        self.presets_group = QGroupBox('Animation Presets')
-        presets_group_layout = QVBoxLayout(self.presets_group)
+        # Config Path
+        self.path_edit = QLineEdit()
+        default_path = os.path.join(
+            get_package_share_directory('bob_face'),
+            'config', 'sequences.yaml'
+        )
+        self.path_edit.setText(default_path)
+        main_layout.addWidget(QLabel('Config Path:'))
+        main_layout.addWidget(self.path_edit)
 
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setMinimumHeight(250)
-        self.scroll_area.setStyleSheet('border: none;')
+        # Scroll Area for Sequences
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll_content = QWidget()
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll.setWidget(self.scroll_content)
+        main_layout.addWidget(self.scroll)
 
-        self.presets_container = QWidget()
-        self.presets_layout = QGridLayout(self.presets_container)
-        self.presets_layout.setSpacing(10)
-        self.presets_layout.setAlignment(Qt.AlignTop)
-
-        self.scroll_area.setWidget(self.presets_container)
-        presets_group_layout.addWidget(self.scroll_area)
-
-        self.refresh_presets()
-        main_layout.addWidget(self.presets_group)
-
-        # --- Global Controls ---
-        ctrl_layout = QHBoxLayout()
-
-        self.rate_label = QLabel('Rate: 30 FPS')
-        self.rate_label.setStyleSheet('font-size: 16px; font-weight: bold; min-width: 120px;')
-        ctrl_layout.addWidget(self.rate_label)
-
-        self.rate_slider = QSlider(Qt.Horizontal)
-        self.rate_slider.setMinimum(1)
-        self.rate_slider.setMaximum(120)
-        self.rate_slider.setValue(30)
-        self.rate_slider.valueChanged.connect(self.update_rate_label)
-        ctrl_layout.addWidget(self.rate_slider)
-
-        main_layout.addLayout(ctrl_layout)
-
-        # --- Editor Section ---
-        editor_group = QGroupBox('Sequence Editor')
-        editor_layout = QGridLayout(editor_group)
-
-        editor_layout.addWidget(QLabel('Name:'), 0, 0)
-        self.edit_name = QLineEdit('New Sequence')
-        editor_layout.addWidget(self.edit_name, 0, 1, 1, 3)
-
-        editor_layout.addWidget(QLabel('Start:'), 1, 0)
-        self.edit_start = QSpinBox()
-        self.edit_start.setRange(0, 100000)
-        self.edit_start.setValue(500)
-        editor_layout.addWidget(self.edit_start, 1, 1)
-
-        editor_layout.addWidget(QLabel('End:'), 1, 2)
-        self.edit_end = QSpinBox()
-        self.edit_end.setRange(0, 100000)
-        self.edit_end.setValue(1000)
-        editor_layout.addWidget(self.edit_end, 1, 3)
-
-        editor_layout.addWidget(QLabel('Type:'), 2, 0)
-        self.edit_type = QSpinBox()
-        self.edit_type.setValue(1)
-        editor_layout.addWidget(self.edit_type, 2, 1)
-
-        btn_test = QPushButton('Test Live')
-        btn_test.setStyleSheet('background-color: #444; color: #ffeb3b;')
-        btn_test.clicked.connect(self.test_sequence)
-        editor_layout.addWidget(btn_test, 2, 2)
-
-        btn_add = QPushButton('Add to List')
-        btn_add.setStyleSheet('background-color: #2e7d32; color: #fff;')
-        btn_add.clicked.connect(self.add_sequence)
-        editor_layout.addWidget(btn_add, 2, 3)
-
-        main_layout.addWidget(editor_group)
-
-        # --- Global Actions ---
-        actions_layout = QHBoxLayout()
-        btn_save = QPushButton('SAVE CONFIG TO YAML')
-        btn_save.setStyleSheet('background-color: #c62828; color: #fff; '
-                               'font-size: 16px; padding: 15px;')
-        btn_save.clicked.connect(self.save_config)
-        actions_layout.addWidget(btn_save)
-        main_layout.addLayout(actions_layout)
-
-        # --- Status Line ---
-        status_font = 'color: #00ff00; font-size: 18px; font-weight: bold;'
-        self.status_label = QLabel('Status: Ready')
-        self.status_label.setStyleSheet(status_font)
-        main_layout.addWidget(self.status_label)
+        # Buttons
+        btn_layout = QHBoxLayout()
+        add_btn = QPushButton('Add Sequence')
+        add_btn.clicked.connect(self.add_sequence)
+        save_btn = QPushButton('Save to YAML')
+        save_btn.clicked.connect(self.save_sequences)
+        btn_layout.addWidget(add_btn)
+        btn_layout.addWidget(save_btn)
+        main_layout.addLayout(btn_layout)
 
         self.setLayout(main_layout)
-        self.setMinimumWidth(500)
 
-    def refresh_presets(self):
-        """Clear and rebuild the animation presets grid based on current sequences."""
-        while self.presets_layout.count():
-            item = self.presets_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                self.clear_layout(item.layout())
+    def load_sequences(self):
+        """Load sequences from the specified YAML file."""
+        path = self.path_edit.text()
+        if not os.path.exists(path):
+            return
 
-        cols = 3  # Use 3 columns to fit more items
-        for i, seq in enumerate(self.sequences):
-            row_widget = QWidget()
-            row_layout = QHBoxLayout(row_widget)
-            row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(5)
+        try:
+            with open(path, 'r') as f:
+                data = yaml.safe_load(f)
+                if data and 'sequences' in data:
+                    for seq_data in data['sequences']:
+                        self.add_sequence(seq_data)
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', f'Failed to load YAML: {e}')
 
-            # Play & Load Button
-            btn_play = QPushButton(seq['name'])
-            btn_play.setToolTip(f"Start: {seq['start']}, End: {seq['end']}")
-            btn_play.clicked.connect(lambda checked, s=seq: self.preset_clicked(s))
-            row_layout.addWidget(btn_play, 4)
+    def add_sequence(self, data=None):
+        """
+        Add a new sequence widget to the list.
 
-            # Delete Button
-            btn_del = QPushButton('X')
-            btn_del.setFixedWidth(25)
-            btn_del.setStyleSheet('background-color: #b71c1c; color: white; padding: 2px;')
-            btn_del.clicked.connect(lambda checked, idx=i: self.delete_sequence(idx))
-            row_layout.addWidget(btn_del, 1)
+        :param data: Optional dictionary containing initial sequence values.
+        """
+        seq_widget = SequenceItemWidget(self.node, data)
+        self.scroll_layout.insertWidget(self.scroll_layout.count(), seq_widget)
+        self.sequences.append(seq_widget)
 
-            self.presets_layout.addWidget(row_widget, i // cols, i % cols)
+    def save_sequences(self):
+        """Save all sequences to the YAML file."""
+        path = self.path_edit.text()
+        data = {'sequences': []}
+        for seq in self.sequences:
+            if seq.name_edit.text():
+                data['sequences'].append({
+                    'name': seq.name_edit.text(),
+                    'start': seq.start_spin.value(),
+                    'end': seq.end_spin.value(),
+                    'rate': seq.rate_spin.value(),
+                    'type': seq.type_spin.value()
+                })
 
-    def clear_layout(self, layout):
-        """Recursively clear a layout and its sub-widgets."""
-        if layout is not None:
-            while layout.count():
-                item = layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-                elif item.layout():
-                    self.clear_layout(item.layout())
+        try:
+            with open(path, 'w') as f:
+                yaml.dump(data, f, default_flow_style=False)
+            QMessageBox.information(self, 'Success', f'Saved to {path}')
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', f'Failed to save: {e}')
 
-    def update_rate_label(self, value):
-        """Update the rate label text when the slider value changes."""
-        self.rate_label.setText(f'Rate: {value} FPS')
 
-    def preset_clicked(self, seq_dict):
-        """Populate editor and play sequence."""
-        self.edit_name.setText(seq_dict['name'])
-        self.edit_start.setValue(seq_dict['start'])
-        self.edit_end.setValue(seq_dict['end'])
-        self.edit_type.setValue(seq_dict['type'])
-        if 'rate' in seq_dict:
-            self.rate_slider.setValue(seq_dict['rate'])
-        self.call_service(seq_dict)
+class SequenceItemWidget(QGroupBox):
+    """A widget representing a single animation sequence."""
 
-    def call_service(self, seq_dict):
-        """Send a SetSequence service request to the face node."""
-        if not self.client.wait_for_service(timeout_sec=1.0):
-            style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
-            self.status_label.setText('Status: Service /set_sequence not available!')
-            self.status_label.setStyleSheet(style)
+    def __init__(self, node, data=None):
+        """
+        Initialize the sequence widget.
+
+        :param node: The ROS2 node for triggering sequences.
+        :param data: Initial data for the sequence.
+        """
+        super().__init__()
+        self.node = node
+        self.init_ui(data)
+
+    def init_ui(self, data):
+        """
+        Set up the sequence widget UI.
+
+        :param data: Initial data dictionary.
+        """
+        layout = QGridLayout()
+
+        # Name
+        self.name_edit = QLineEdit()
+        if data:
+            self.name_edit.setText(data.get('name', ''))
+        layout.addWidget(QLabel('Name:'), 0, 0)
+        layout.addWidget(self.name_edit, 0, 1)
+
+        # Start/End
+        self.start_spin = QSpinBox()
+        self.start_spin.setRange(0, 50000)
+        self.end_spin = QSpinBox()
+        self.end_spin.setRange(0, 50000)
+        if data:
+            self.start_spin.setValue(data.get('start', 0))
+            self.end_spin.setValue(data.get('end', 100))
+
+        layout.addWidget(QLabel('Start:'), 1, 0)
+        layout.addWidget(self.start_spin, 1, 1)
+        layout.addWidget(QLabel('End:'), 1, 2)
+        layout.addWidget(self.end_spin, 1, 3)
+
+        # Sliders for visual range
+        self.start_slider = QSlider(Qt.Horizontal)
+        self.start_slider.setRange(0, 2000)
+        self.start_slider.setValue(self.start_spin.value())
+        self.start_slider.valueChanged.connect(self.start_spin.setValue)
+        self.start_spin.valueChanged.connect(self.start_slider.setValue)
+
+        self.end_slider = QSlider(Qt.Horizontal)
+        self.end_slider.setRange(0, 2000)
+        self.end_slider.setValue(self.end_spin.value())
+        self.end_slider.valueChanged.connect(self.end_spin.setValue)
+        self.end_spin.valueChanged.connect(self.end_slider.setValue)
+
+        layout.addWidget(self.start_slider, 2, 0, 1, 4)
+        layout.addWidget(self.end_slider, 3, 0, 1, 4)
+
+        # Rate and Type
+        self.rate_spin = QSpinBox()
+        self.rate_spin.setValue(30)
+        self.type_spin = QSpinBox()
+        self.type_spin.setValue(1)
+        if data:
+            self.rate_spin.setValue(data.get('rate', 30))
+            self.type_spin.setValue(data.get('type', 1))
+
+        layout.addWidget(QLabel('Rate:'), 4, 0)
+        layout.addWidget(self.rate_spin, 4, 1)
+        layout.addWidget(QLabel('Type:'), 4, 2)
+        layout.addWidget(self.type_spin, 4, 3)
+
+        # Actions
+        test_btn = QPushButton('Test')
+        test_btn.clicked.connect(self.test_sequence)
+        del_btn = QPushButton('Delete')
+        del_btn.clicked.connect(self.deleteLater)
+
+        layout.addWidget(test_btn, 5, 0, 1, 2)
+        layout.addWidget(del_btn, 5, 2, 1, 2)
+
+        self.setLayout(layout)
+
+    def test_sequence(self):
+        """Call set_sequence service with current widget values."""
+        if not rclpy.ok():
+            return
+
+        client = self.node.create_client(SetSequence, 'set_sequence')
+        if not client.wait_for_service(timeout_sec=1.0):
+            QMessageBox.warning(self, 'Error', 'Service not available')
             return
 
         req = SetSequence.Request()
-        req.start = seq_dict['start']
-        req.end = seq_dict['end']
-        req.type = seq_dict['type']
-        req.rate = self.rate_slider.value()
+        req.start = self.start_spin.value()
+        req.end = self.end_spin.value()
+        req.rate = self.rate_spin.value()
+        req.type = self.type_spin.value()
 
-        style = 'color: #007acc; font-size: 18px; font-weight: bold;'
-        self.status_label.setText(f"Status: Sending {seq_dict['name']}...")
-        self.status_label.setStyleSheet(style)
+        client.call_async(req)
 
-        future = self.client.call_async(req)
-        future.add_done_callback(self.service_callback)
 
-    def service_callback(self, future):
-        """Handle the result of a service call."""
-        try:
-            response = future.result()
-            if not response.error:
-                style = 'color: #00ff00; font-size: 18px; font-weight: bold;'
-                self.status_label.setText('Status: Sequence accepted')
-                self.status_label.setStyleSheet(style)
-            else:
-                style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
-                self.status_label.setText(f'Status Error: {response.error}')
-                self.status_label.setStyleSheet(style)
-        except Exception as e:
-            style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
-            self.status_label.setText(f'Status Exception: {str(e)}')
-            self.status_label.setStyleSheet(style)
+class GuiNode(Node):
+    """Minimal ROS 2 node to host GUI service calls."""
 
-    def marker_callback(self, msg):
-        """Handle incoming MarkerArray messages (status monitoring)."""
-        self.marker_count += 1
-        if self.marker_count % 30 == 0:
-            self.node.get_logger().debug(f'Received MarkerArray frame {self.marker_count}')
+    def __init__(self):
+        """Initialize the node."""
+        super().__init__('face_gui')
 
-    def test_sequence(self):
-        """Trigger a temporary 'TEST' sequence using current editor values."""
-        temp_seq = {
-            'name': 'TEST',
-            'start': self.edit_start.value(),
-            'end': self.edit_end.value(),
-            'type': self.edit_type.value()
-        }
-        self.call_service(temp_seq)
 
-    def add_sequence(self):
-        """Add the current editor configuration to the sequence list."""
-        name = self.edit_name.text()
-        new_seq = {
-            'name': name,
-            'start': self.edit_start.value(),
-            'end': self.edit_end.value(),
-            'type': self.edit_type.value(),
-            'rate': self.rate_slider.value()
-        }
+def main():
+    """Start the GUI and ROS 2 spin loop."""
+    # Required for Ctrl+C to work
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-        # Overwrite if exists, otherwise append
-        existing_idx = -1
-        for idx, s in enumerate(self.sequences):
-            if s['name'] == name:
-                existing_idx = idx
-                break
+    rclpy.init()
+    node = GuiNode()
 
-        if existing_idx >= 0:
-            self.sequences[existing_idx] = new_seq
-            self.status_label.setText(f'Status: Updated {name}')
-        else:
-            self.sequences.append(new_seq)
-            self.status_label.setText(f'Status: Added {name}')
+    app = QApplication(sys.argv)
+    gui = SequenceGUI(node)
+    gui.show()
 
-        self.refresh_presets()
+    # Periodically process ROS events
+    timer = QTimer()
+    timer.timeout.connect(lambda: rclpy.spin_once(node, timeout_sec=0))
+    timer.start(10)
 
-    def delete_sequence(self, index):
-        """Remove a sequence from the list by its index."""
-        if 0 <= index < len(self.sequences):
-            name = self.sequences[index]['name']
-            del self.sequences[index]
-            self.refresh_presets()
-            self.status_label.setText(f'Status: Deleted {name}')
-
-    def save_config(self):
-        """Persist the current sequence list to the YAML configuration file."""
-        try:
-            with open(self.config_path, 'w') as f:
-                yaml.dump({'sequences': self.sequences}, f, default_flow_style=False)
-            style = 'color: #00ff00; font-size: 18px; font-weight: bold;'
-            self.status_label.setText('Status: Config SAVED to YAML!')
-            self.status_label.setStyleSheet(style)
-            QMessageBox.information(self, 'Success', f'Config saved to:\n{self.config_path}')
-        except Exception as e:
-            style = 'color: #ff4444; font-size: 18px; font-weight: bold;'
-            self.status_label.setText(f'Save Error: {str(e)}')
-            self.status_label.setStyleSheet(style)
-
-    def ros_spin(self):
-        """Process ROS 2 callbacks periodically."""
-        if rclpy.ok():
-            rclpy.spin_once(self.node, timeout_sec=0)
-
-    def closeEvent(self, event):
-        """Ensure clean shutdown of ROS 2 when the window is closed."""
-        self.node.destroy_node()
+    try:
+        sys.exit(app.exec_())
+    finally:
+        node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
-        event.accept()
 
 
 if __name__ == '__main__':
-    # Add signal handler
-    signal.signal(signal.SIGINT, sigint_handler)
-    app = QApplication(sys.argv)
-
-    # Use a QTimer to periodically process signals (allows Ctrl+C to be caught)
-    timer = QTimer()
-    timer.start(500)
-    timer.timeout.connect(lambda: None)
-
-    gui = FaceGui()
-    gui.show()
-
-    # Catching KeyboardInterrupt to exit gracefully
-    try:
-        sys.exit(app.exec_())
-    except KeyboardInterrupt:
-        pass
+    main()
